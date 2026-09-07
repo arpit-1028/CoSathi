@@ -239,6 +239,7 @@ export const en = {
       PENDING: "Pending Review",
       PROVISIONAL: "Provisional (New)",
       VERIFIED: "Verified Member",
+      APPROVED: "Verified Member",
       SUSPENDED: "Suspended",
     },
 

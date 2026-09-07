@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { EnRouteMapTracker } from './EnRouteMapTracker';
@@ -12,10 +12,6 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  Receipt,
-  CreditCard,
-  Building2,
-  HeartHandshake,
 } from 'lucide-react';
 
 export const ActiveBookingTracker = ({
@@ -24,10 +20,55 @@ export const ActiveBookingTracker = ({
   onCompleteJob,
   onCancelBooking,
 }) => {
-  const { t } = useLanguage();
-
-  // Statuses: 'assigned' -> 'en_route' -> 'in_progress' -> 'completed'
+  const { t, language } = useLanguage();
   const [jobStatus, setJobStatus] = useState('assigned');
+  const [currentWorker, setCurrentWorker] = useState(workerData || null);
+  const [currentBooking, setCurrentBooking] = useState(bookingData || null);
+
+  const bId = bookingData?._id || bookingData?.bookingId;
+
+  // Real-time polling to sync with worker actions
+  useEffect(() => {
+    if (!bId) return;
+
+    let isMounted = true;
+    const syncStatus = async () => {
+      try {
+        const res = await api.get(`/bookings/${bId}`);
+        if (!isMounted || !res.data?.booking) return;
+
+        const b = res.data.booking;
+        setCurrentBooking(b);
+        if (res.data.workerDetails) {
+          setCurrentWorker(res.data.workerDetails);
+        }
+
+        const s = b.status?.toUpperCase();
+        if (s === 'ON_THE_WAY') {
+          setJobStatus('en_route');
+        } else if (s === 'ARRIVED' || s === 'IN_PROGRESS') {
+          setJobStatus('in_progress');
+        } else if (['WORK_SUBMITTED', 'PAID', 'COMPLETED'].includes(s)) {
+          setJobStatus('completed');
+          if (onCompleteJob) onCompleteJob();
+        }
+      } catch (e) {
+        console.warn('Sync status notice:', e.message);
+      }
+    };
+
+    syncStatus();
+    const interval = setInterval(syncStatus, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [bId, onCompleteJob]);
+
+  // Keep workerData in sync if prop changes
+  useEffect(() => {
+    if (workerData) setCurrentWorker(workerData);
+  }, [workerData]);
 
   const statusSteps = [
     { key: 'assigned', label: t('customer.statusAssigned'), icon: CheckCircle2 },
@@ -38,14 +79,27 @@ export const ActiveBookingTracker = ({
 
   const currentStepIndex = statusSteps.findIndex((s) => s.key === jobStatus);
 
-  const advanceStatus = () => {
-    if (jobStatus === 'assigned') setJobStatus('en_route');
-    else if (jobStatus === 'en_route') setJobStatus('in_progress');
-    else if (jobStatus === 'in_progress') {
+  const advanceStatus = async () => {
+    if (jobStatus === 'assigned') {
+      setJobStatus('en_route');
+      if (bId) {
+        try { await api.post(`/bookings/${bId}/on-the-way`); } catch (e) {}
+      }
+    } else if (jobStatus === 'en_route') {
+      setJobStatus('in_progress');
+      if (bId) {
+        try { await api.post(`/bookings/${bId}/start-work`); } catch (e) {}
+      }
+    } else if (jobStatus === 'in_progress') {
       setJobStatus('completed');
       if (onCompleteJob) onCompleteJob();
     }
   };
+
+  const activeWorkerName = currentWorker?.name || currentBooking?.assignedWorker?.name || 'Assigned Worker';
+  const activeWorkerPhone = currentWorker?.phone || currentBooking?.assignedWorker?.phone || '';
+  const activeWorkerTrade = currentWorker?.trade || currentBooking?.category?.name?.en || currentBooking?.serviceCategory || (language === 'hi' ? 'प्रमाणित सहकारी साथी' : 'Certified Cooperative Member');
+  const activeMemberId = currentWorker?.memberId || (currentWorker?._id ? `COS-${currentWorker._id.toString().slice(-4).toUpperCase()}` : 'COS-MEMBER');
 
   return (
     <div className="space-y-6">
@@ -54,10 +108,10 @@ export const ActiveBookingTracker = ({
         <div className="flex items-center justify-between mb-5 border-b border-[#E2DDD3] pb-3">
           <div className="space-y-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#24324A]">
-              {t('customer.trackingTitle')} • सेवा ट्रैकिंग
+              {t('customer.trackingTitle')} • {language === 'hi' ? 'सेवा ट्रैकिंग' : 'Live Tracking'}
             </span>
             <h3 className="font-serif text-lg font-bold text-[#20242A]">
-              Booking #{bookingData?.bookingNumber || 'CS-2026-0905-081'}
+              Booking #{currentBooking?.bookingNumber || 'CS-LIVE'}
             </h3>
           </div>
           <span className="px-3 py-1 rounded-md text-xs font-semibold bg-[#F2EFEB] text-[#24324A] border border-[#D9D5CC]">
@@ -117,12 +171,12 @@ export const ActiveBookingTracker = ({
         )}
       </div>
 
-      {/* Live En-Route Map Telemetry Tracker (Active during en_route and in_progress) */}
+      {/* Live En-Route Map Telemetry Tracker */}
       {(jobStatus === 'en_route' || jobStatus === 'in_progress') && (
         <EnRouteMapTracker
-          bookingId={bookingData?._id || bookingData?.bookingId}
-          workerData={workerData}
-          destinationAddress={bookingData?.address?.addressLine}
+          bookingId={bId}
+          workerData={currentWorker}
+          destinationAddress={currentBooking?.address?.addressLine || currentBooking?.location?.addressLine}
           initialStatus={jobStatus === 'en_route' ? 'ON_THE_WAY' : 'IN_PROGRESS'}
           onArrived={() => {
             if (jobStatus === 'en_route') setJobStatus('in_progress');
@@ -130,44 +184,44 @@ export const ActiveBookingTracker = ({
         />
       )}
 
-      {/* Worker Details Card (strictly revealed after assignment) */}
+      {/* Worker Details Card */}
       <div className="bg-[#FFFFFF] rounded-xl p-5 sm:p-6 border border-[#D9D5CC] shadow-card space-y-4">
         <div className="flex items-start justify-between pb-3 border-b border-[#E2DDD3]">
           <div className="space-y-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#24324A]">
-              {t('customer.workerRevealedTitle')} • अधिकृत सहकारी साथी
+              {t('customer.workerRevealedTitle')} • {language === 'hi' ? 'अधिकृत सहकारी साथी' : 'Authorized Cooperative Sathi'}
             </span>
             <p className="text-xs text-[#636D79]">
               {t('customer.workerRevealedSubtitle')}
             </p>
           </div>
           <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#F2EFEB] text-[#3C5A48] border border-[#D9D5CC]">
-            {workerData?.fairScoreRank || 'Fair Allocation Match'}
+            {currentWorker?.fairScoreRank || 'Fair Rotation Match'}
           </span>
         </div>
 
         <div className="flex items-center space-x-4">
           <div className="w-14 h-14 rounded-lg bg-[#24324A] text-[#DF9F35] font-serif font-bold flex items-center justify-center text-xl shadow-xs border border-[#162031]">
-            {workerData?.name ? workerData.name.charAt(0) : 'W'}
+            {activeWorkerName.charAt(0)}
           </div>
 
           <div className="space-y-1 flex-1">
             <div className="flex items-center justify-between">
-              <h4 className="font-serif text-lg font-bold text-[#20242A]">{workerData?.name}</h4>
+              <h4 className="font-serif text-lg font-bold text-[#20242A]">{activeWorkerName}</h4>
               <div className="flex items-center space-x-1 text-xs font-semibold text-[#20242A] bg-[#F7F4EE] px-2 py-0.5 rounded-md border border-[#D9D5CC]">
                 <Star className="w-3.5 h-3.5 fill-[#DF9F35] text-[#DF9F35]" />
-                <span>{workerData?.rating || 4.9}</span>
-                <span className="text-[#636D79] font-normal">({workerData?.reviewsCount || 180})</span>
+                <span>{currentWorker?.rating || 4.9}</span>
+                <span className="text-[#636D79] font-normal">({currentWorker?.reviewsCount || currentWorker?.jobsCompleted || 50})</span>
               </div>
             </div>
 
-            <p className="text-xs text-[#636D79] font-medium">
-              {workerData?.trade || 'Certified Master Electrician'}
+            <p className="text-xs text-[#636D79] font-medium capitalize">
+              {activeWorkerTrade}
             </p>
 
             <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
               <span className="bg-[#F2EFEB] text-[#20242A] font-mono px-2 py-0.5 rounded border border-[#D9D5CC]">
-                ID: {workerData?.memberId || 'COS-DL-2026-101'}
+                ID: {activeMemberId}
               </span>
               <span className="bg-[#F7F4EE] text-[#3C5A48] font-semibold px-2 py-0.5 rounded border border-[#D9D5CC] flex items-center space-x-1">
                 <ShieldCheck className="w-3 h-3 text-[#3C5A48]" />
@@ -179,16 +233,23 @@ export const ActiveBookingTracker = ({
 
         {/* Contact actions */}
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <a
-            href={`tel:${workerData?.phone || '+919810010001'}`}
-            className="p-2.5 rounded-lg bg-[#F7F4EE] hover:bg-[#F2EFEB] border border-[#D9D5CC] text-[#20242A] text-xs font-semibold flex items-center justify-center space-x-2 transition-colors"
-          >
-            <Phone className="w-3.5 h-3.5 text-[#24324A]" />
-            <span>{t('customer.callWorker')}</span>
-          </a>
+          {activeWorkerPhone ? (
+            <a
+              href={`tel:${activeWorkerPhone}`}
+              className="p-2.5 rounded-lg bg-[#F7F4EE] hover:bg-[#F2EFEB] border border-[#D9D5CC] text-[#20242A] text-xs font-semibold flex items-center justify-center space-x-2 transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5 text-[#24324A]" />
+              <span>{t('customer.callWorker')}</span>
+            </a>
+          ) : (
+            <div className="p-2.5 rounded-lg bg-[#F7F4EE] border border-[#D9D5CC] text-[#636D79] text-xs font-semibold flex items-center justify-center space-x-2">
+              <Phone className="w-3.5 h-3.5 text-[#636D79]" />
+              <span>{t('customer.callWorker')}</span>
+            </div>
+          )}
 
           <button
-            onClick={() => alert(`Messaging channel connected with ${workerData?.name}`)}
+            onClick={() => alert(`Direct messaging channel connected with ${activeWorkerName}`)}
             className="p-2.5 rounded-lg bg-[#F7F4EE] hover:bg-[#F2EFEB] border border-[#D9D5CC] text-[#20242A] text-xs font-semibold flex items-center justify-center space-x-2 transition-colors"
           >
             <MessageSquare className="w-3.5 h-3.5 text-[#A65343]" />
@@ -201,9 +262,9 @@ export const ActiveBookingTracker = ({
           <button
             type="button"
             onClick={async () => {
-              if (window.confirm('Are you sure you want to cancel this booking? / क्या आप यह बुकिंग रद्द करना चाहते हैं?')) {
+              const confirmMsg = language === 'hi' ? 'क्या आप यह बुकिंग रद्द करना चाहते हैं?' : 'Are you sure you want to cancel this booking?';
+              if (window.confirm(confirmMsg)) {
                 try {
-                  const bId = bookingData?._id || bookingData?.bookingId;
                   if (bId) {
                     await api.post(`/bookings/${bId}/cancel`, { reason: 'Cancelled by customer' });
                   }
@@ -215,10 +276,11 @@ export const ActiveBookingTracker = ({
             }}
             className="w-full py-2.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors text-center"
           >
-            ✕ Cancel Booking / बुकिंग रद्द करें
+            ✕ {language === 'hi' ? 'बुकिंग रद्द करें' : 'Cancel Booking'}
           </button>
         </div>
       </div>
     </div>
   );
 };
+export default ActiveBookingTracker;

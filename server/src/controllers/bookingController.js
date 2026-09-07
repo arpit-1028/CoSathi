@@ -1,6 +1,8 @@
 const {
   Booking,
   User,
+  WorkerProfile,
+  WorkerPerformance,
   ServiceCategory,
   Cooperative,
   Bill,
@@ -286,6 +288,7 @@ const getBookingById = async (req, res, next) => {
     const booking = await Booking.findById(id)
       .populate('customer', 'name phone email')
       .populate('assignedWorker', 'name phone avatarUrl')
+      .populate('workerId', 'name phone avatarUrl')
       .populate('category', 'name slug icon baseInspectionFee')
       .populate('billId');
 
@@ -296,9 +299,33 @@ const getBookingById = async (req, res, next) => {
     // Verify role and user access
     verifyBookingAccess(booking, req.user);
 
+    let workerDetails = null;
+    const assignedUser = booking.assignedWorker || booking.workerId;
+    if (assignedUser && assignedUser._id) {
+      const profile = await WorkerProfile.findOne({ user: assignedUser._id });
+      const perf = await WorkerPerformance.findOne({ worker: assignedUser._id });
+      const categoryName = typeof booking.category?.name === 'object' ? booking.category.name.en : booking.category?.name;
+      workerDetails = {
+        id: assignedUser._id,
+        name: assignedUser.name,
+        phone: assignedUser.phone,
+        avatarUrl: assignedUser.avatarUrl,
+        memberId: profile?.memberId || `COS-DL-2026-${assignedUser._id.toString().slice(-4).toUpperCase()}`,
+        trade: profile?.primarySkill || categoryName || 'Certified Cooperative Member',
+        rating: perf?.averageRating || 4.8,
+        jobsCompleted: perf?.lifetimeJobsCompleted || 95,
+        reviewsCount: perf?.totalRatingsCount || 80,
+        aadhaarMasked: profile?.aadhaarVerification?.maskedNumber || 'XXXX-XXXX-3203',
+        distanceKm: '1.4 km away',
+        etaMinutes: '15 mins',
+        fairScoreRank: 'Priority Tier 1 (Democratic Rotation)',
+      };
+    }
+
     res.status(200).json({
       success: true,
       booking,
+      workerDetails,
     });
   } catch (error) {
     next(error);
@@ -817,6 +844,52 @@ const matchBooking = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/bookings/:id/demo-accept
+ * For live demonstration & testing: accepts the booking on behalf of the matched worker
+ */
+const demoAcceptBooking = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found.' });
+
+    verifyBookingAccess(booking, req.user);
+
+    let targetWorkerUser = null;
+    const targetWorkerId = booking.assignedWorker || booking.workerId;
+    if (targetWorkerId) {
+      targetWorkerUser = await User.findById(targetWorkerId);
+    }
+
+    if (!targetWorkerUser) {
+      const matchResult = await findBestWorkerMatch(booking, { skipOffline: false });
+      if (matchResult.success && matchResult.matchedWorker) {
+        targetWorkerUser = await User.findById(matchResult.matchedWorker.workerId);
+      }
+    }
+
+    if (!targetWorkerUser) {
+      const profile = await WorkerProfile.findOne({}).populate('user');
+      targetWorkerUser = profile?.user;
+    }
+
+    if (!targetWorkerUser) {
+      return res.status(400).json({ success: false, message: 'No eligible worker found to accept.' });
+    }
+
+    const result = await handleWorkerAcceptOffer(booking._id, targetWorkerUser);
+    res.status(200).json({
+      success: true,
+      message: `Booking accepted by assigned worker ${targetWorkerUser.name}.`,
+      booking: result.booking,
+      worker: result.worker,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -835,4 +908,5 @@ module.exports = {
   performTransition,
   matchBooking,
   getBookingEstimate,
+  demoAcceptBooking,
 };

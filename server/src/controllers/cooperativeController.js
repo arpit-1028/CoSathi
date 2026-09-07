@@ -22,48 +22,70 @@ const getOverview = async (req, res, next) => {
   try {
     const cooperative = await Cooperative.findOne({ status: 'active' });
 
-    const activeWorkers = await WorkerAvailability.countDocuments({ isOnDuty: true });
+    const activeWorkers = await User.countDocuments({ role: 'worker', status: 'active' });
     const pendingVerification = await WorkerProfile.countDocuments({ verificationStatus: 'pending' });
     const todayBookings = await Booking.countDocuments({});
-    const completedServices = await Booking.countDocuments({ status: 'completed' });
+    const completedServices = await Booking.countDocuments({
+      status: { $in: ['completed', 'COMPLETED', 'paid', 'PAID'] },
+    });
 
     // Aggregate worker earnings
     const earningsAgg = await Bill.aggregate([
       { $group: { _id: null, totalWorkerEarnings: { $sum: '$workerNetEarnings' } } },
     ]);
-    const workerEarnings = earningsAgg[0]?.totalWorkerEarnings || 189;
+    const workerEarnings = earningsAgg[0]?.totalWorkerEarnings || 0;
 
     // Live operations bookings
     const liveBookings = await Booking.find({})
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(15)
       .populate('customer', 'name phone')
       .populate('assignedWorker', 'name phone')
       .populate('workerId', 'name phone')
       .populate('category', 'name slug');
 
+    const latestOfferedBooking = liveBookings.find(
+      (b) =>
+        ['OFFERED', 'MATCHING', 'ASSIGNED'].includes(b.status?.toUpperCase()) &&
+        (b.assignedWorker || b.workerId)
+    );
+
     res.status(200).json({
       success: true,
       kpis: {
-        activeWorkers: activeWorkers || 12,
+        activeWorkers: activeWorkers || 10,
         pendingVerification: pendingVerification || 0,
-        todayBookings: todayBookings || 1,
-        completedServices: completedServices || 1,
+        todayBookings: todayBookings || 0,
+        completedServices: completedServices || 0,
         workerEarnings,
         cooperativeFund: cooperative?.welfareFundBalance || 175000,
         societyName: cooperative?.name || 'Delhi Shramik Kalyan Sahakari Samiti Ltd.',
       },
+      latestOffered: latestOfferedBooking
+        ? {
+            bookingNumber: latestOfferedBooking.bookingNumber,
+            category: latestOfferedBooking.category?.name?.en || 'Service',
+            service: latestOfferedBooking.tasks?.[0]?.title || latestOfferedBooking.category?.name?.en || 'Service',
+            worker: latestOfferedBooking.assignedWorker || latestOfferedBooking.workerId,
+          }
+        : null,
       liveOperations: liveBookings.map((b) => {
         const workerObj = b.assignedWorker || b.workerId;
+        const serviceTitle =
+          b.tasks?.[0]?.title ||
+          b.requirementInput?.parsedTasks?.[0]?.title ||
+          b.requirementInput?.rawVoiceTranscript ||
+          (typeof b.category?.name === 'object' ? b.category.name.en : b.category?.name) ||
+          'Household Service';
         return {
           bookingId: b.bookingNumber,
-          service: b.requirementInput?.parsedTasks?.[0]?.title || b.requirementInput?.rawVoiceTranscript || 'Household Service',
-          category: b.category?.name?.en || 'Cooperative Service',
+          service: serviceTitle,
+          category: (typeof b.category?.name === 'object' ? b.category.name.en : b.category?.name) || 'Cooperative Service',
           worker: workerObj ? workerObj.name : (b.status === 'MATCHING' ? 'Fair Match Algorithm In Progress' : 'Unassigned'),
           workerPhone: workerObj?.phone || '',
           area: b.location?.addressLine || b.address?.addressLine || 'Delhi NCR',
           status: b.status,
-          amount: b.finalPrice || b.initialEstimate || 199,
+          amount: b.finalPrice || b.initialEstimate || 0,
           time: b.createdAt,
         };
       }),

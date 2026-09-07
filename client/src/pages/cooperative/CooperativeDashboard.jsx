@@ -8,18 +8,18 @@ import {
   IndianRupee,
   HeartHandshake,
   Activity,
-  ArrowUpRight,
   ShieldCheck,
   RefreshCw,
+  BellRing,
 } from 'lucide-react';
 
 export const CooperativeDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchOverview = async () => {
+  const fetchOverview = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const res = await api.get('/cooperative/overview');
       if (res.data.success) {
         setData(res.data);
@@ -27,54 +27,39 @@ export const CooperativeDashboard = () => {
     } catch (err) {
       console.error('Failed to load overview data', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOverview();
+    fetchOverview(true);
+    // Real-time polling every 3 seconds so live dispatch triggers appear automatically
+    const interval = setInterval(() => {
+      fetchOverview(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const kpis = data?.kpis || {
-    activeWorkers: 12,
+    activeWorkers: 0,
     pendingVerification: 0,
-    todayBookings: 1,
-    completedServices: 1,
-    workerEarnings: 189,
+    todayBookings: 0,
+    completedServices: 0,
+    workerEarnings: 0,
     cooperativeFund: 175000,
     societyName: 'Delhi Shramik Kalyan Sahakari Samiti Ltd.',
   };
 
-  const liveOperations = data?.liveOperations?.length > 0
-    ? data.liveOperations
-    : [
-        {
-          bookingId: 'CS-2026-0905-001',
-          service: 'Ceiling Fan Repair / Capacitor Replace',
-          category: 'Electrical Works',
-          worker: 'Ramesh Kumar (Worker A)',
-          area: 'B-42, Lajpat Nagar II',
-          status: 'completed',
-          amount: 199,
-        },
-        {
-          bookingId: 'CS-2026-0905-081',
-          service: 'Ceiling Fan Diagnostic & Service',
-          category: 'Electrical Works',
-          worker: 'Suresh Yadav (Worker C)',
-          area: 'Sector 11, Dwarka',
-          status: 'in_progress',
-          amount: 298,
-        },
-      ];
+  const liveOperations = data?.liveOperations || [];
+  const latestOffered = data?.latestOffered || null;
 
   const cards = [
     { label: 'Active On-Duty Workers', value: kpis.activeWorkers, icon: Users, color: 'text-cosathi-forest', bg: 'bg-emerald-50' },
     { label: 'Pending KYC Approvals', value: kpis.pendingVerification, icon: UserCheck, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: "Today's Total Bookings", value: kpis.todayBookings, icon: CalendarCheck, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { label: "Total Bookings", value: kpis.todayBookings, icon: CalendarCheck, color: 'text-sky-600', bg: 'bg-sky-50' },
     { label: 'Completed Services', value: kpis.completedServices, icon: CheckCircle2, color: 'text-cosathi-clay', bg: 'bg-rose-50' },
-    { label: 'Total Worker Earnings', value: `₹${kpis.workerEarnings.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'text-cosathi-forest', bg: 'bg-emerald-50' },
-    { label: 'Cooperative Welfare Fund', value: `₹${kpis.cooperativeFund.toLocaleString('en-IN')}`, icon: HeartHandshake, color: 'text-cosathi-ochre', bg: 'bg-amber-50' },
+    { label: 'Total Worker Earnings', value: `₹${(kpis.workerEarnings || 0).toLocaleString('en-IN')}`, icon: IndianRupee, color: 'text-cosathi-forest', bg: 'bg-emerald-50' },
+    { label: 'Cooperative Welfare Fund', value: `₹${(kpis.cooperativeFund || 175000).toLocaleString('en-IN')}`, icon: HeartHandshake, color: 'text-cosathi-ochre', bg: 'bg-amber-50' },
   ];
 
   return (
@@ -97,7 +82,7 @@ export const CooperativeDashboard = () => {
         </div>
 
         <button
-          onClick={fetchOverview}
+          onClick={() => fetchOverview(true)}
           disabled={loading}
           className="p-2.5 rounded-lg border border-[#D9D5CC] bg-[#F7F4EE] hover:bg-[#F2EFEB] text-xs font-semibold text-[#20242A] flex items-center space-x-1.5 self-start sm:self-auto transition-colors"
         >
@@ -105,6 +90,31 @@ export const CooperativeDashboard = () => {
           <span>Refresh Ledger</span>
         </button>
       </div>
+
+      {/* Live Offered Booking Alert Banner */}
+      {latestOffered && (
+        <div className="bg-[#1B4278] text-white p-4 sm:p-5 rounded-xl border border-[#2B589A] shadow-md animate-pulse space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="inline-flex items-center space-x-2 bg-amber-400 text-slate-900 px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider">
+                <BellRing className="w-3.5 h-3.5" />
+                <span>⚡ Live Booking Dispatched!</span>
+              </div>
+              <h4 className="text-base font-bold">
+                Booking #{latestOffered.bookingNumber} • {latestOffered.service || latestOffered.category || 'Service'}
+              </h4>
+              <p className="text-xs text-blue-100">
+                Assigned Worker: <strong className="text-white text-sm underline">{latestOffered.worker?.name || 'Worker'}</strong>
+                {' '}| Phone: <strong className="text-amber-300 font-mono text-sm">{latestOffered.worker?.phone}</strong>
+                {' '}| Password: <strong className="text-amber-300 font-mono">CoSathi@2026</strong>
+              </p>
+            </div>
+            <div className="text-xs bg-white/10 px-3 py-2 rounded-lg border border-white/20 text-blue-100">
+              💡 Open worker login with this phone number to accept this live request!
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 6 Primary KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -154,37 +164,48 @@ export const CooperativeDashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2DDD3]">
-              {liveOperations.map((b, idx) => (
-                <tr key={idx} className="hover:bg-[#F7F4EE] transition-colors">
-                  <td className="py-3 px-3 font-mono font-bold text-[#24324A]">
-                    {b.bookingId}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="font-semibold text-[#20242A] block">{b.service}</span>
-                    <span className="text-[10px] text-[#636D79]">{b.category}</span>
-                  </td>
-                  <td className="py-3 px-3 font-medium text-[#20242A]">
-                    {b.worker}
-                  </td>
-                  <td className="py-3 px-3 text-[#636D79]">
-                    {b.area}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        b.status === 'completed'
-                          ? 'bg-[#F2EFEB] text-[#3C5A48] border border-[#D9D5CC]'
-                          : 'bg-[#FFF8E7] text-[#C58B2A] border border-[#DF9F35]'
-                      }`}
-                    >
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right font-serif font-bold text-[#20242A]">
-                    ₹{b.amount}
+              {liveOperations.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-[#636D79]">
+                    No active operations in progress. Place a customer booking to observe live fair matching!
                   </td>
                 </tr>
-              ))}
+              ) : (
+                liveOperations.map((b, idx) => (
+                  <tr key={idx} className="hover:bg-[#F7F4EE] transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-[#24324A]">
+                      {b.bookingId}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="font-semibold text-[#20242A] block">{b.service}</span>
+                      <span className="text-[10px] text-[#636D79]">{b.category}</span>
+                    </td>
+                    <td className="py-3 px-3 font-medium text-[#20242A]">
+                      <div>{b.worker}</div>
+                      {b.workerPhone && (
+                        <div className="text-[10px] font-mono text-slate-500">{b.workerPhone}</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-[#636D79]">
+                      {b.area}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          ['completed', 'COMPLETED', 'paid', 'PAID'].includes(b.status)
+                            ? 'bg-[#F2EFEB] text-[#3C5A48] border border-[#D9D5CC]'
+                            : 'bg-[#FFF8E7] text-[#C58B2A] border border-[#DF9F35]'
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right font-serif font-bold text-[#20242A]">
+                      ₹{b.amount}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -192,3 +213,4 @@ export const CooperativeDashboard = () => {
     </div>
   );
 };
+export default CooperativeDashboard;

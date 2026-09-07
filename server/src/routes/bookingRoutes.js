@@ -19,6 +19,7 @@ const {
   performTransition,
   matchBooking,
   getBookingEstimate,
+  demoAcceptBooking,
 } = require('../controllers/bookingController');
 const {
   getBookingLiveTracking,
@@ -39,6 +40,8 @@ router.post('/:id/match', matchBooking);
 // Worker operations
 router.get('/worker/assigned', requireRole(['worker', 'cooperative_admin']), getWorkerBookings);
 router.get('/worker/active', requireRole(['worker', 'cooperative_admin']), getWorkerActiveBooking);
+router.get('/assigned', requireRole(['worker', 'cooperative_admin']), getWorkerBookings);
+router.get('/active', requireRole(['worker', 'cooperative_admin']), getWorkerActiveBooking);
 
 // Individual booking lifecycle operations (Access validated inside controller)
 router.get('/:id', getBookingById);
@@ -48,6 +51,7 @@ router.post('/:id/cancel', cancelBooking);
 router.post('/:id/pay', approveAndPay);
 router.post('/:id/dispute', raiseDispute);
 router.post('/:id/transition', performTransition);
+router.post('/:id/demo-accept', demoAcceptBooking);
 
 // Worker lifecycle actions
 router.post('/:id/accept', requireRole(['worker', 'cooperative_admin']), acceptBooking);

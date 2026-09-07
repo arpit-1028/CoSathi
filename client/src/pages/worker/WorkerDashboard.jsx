@@ -91,11 +91,17 @@ export const WorkerDashboard = () => {
     };
   }, [socket]);
 
-  // Load existing active booking on initial mount if any
+  // Load existing active booking on initial mount and poll every 3s
   useEffect(() => {
     const fetchActiveJob = async () => {
       try {
-        const res = await api.get('/worker/bookings/active');
+        let res;
+        try {
+          res = await api.get('/bookings/worker/active');
+        } catch (e) {
+          res = await api.get('/bookings/active');
+        }
+
         if (res.data?.hasActiveBooking && res.data.booking) {
           const b = res.data.booking;
           setActiveJob({
@@ -104,7 +110,7 @@ export const WorkerDashboard = () => {
             bookingNumber: b.bookingNumber,
             customerName: b.customer?.name || 'Customer',
             rawText: b.voiceTranscript || 'Service requirement',
-            address: b.address?.addressLine || 'Delhi',
+            address: b.address?.addressLine || b.address?.city || 'Delhi',
             floorPayout: b.finalPrice || b.initialEstimate,
             status: b.status === 'ACCEPTED' ? 'accepted'
               : b.status === 'ON_THE_WAY' ? 'en_route'
@@ -120,7 +126,10 @@ export const WorkerDashboard = () => {
         // Safe ignore
       }
     };
+
     fetchActiveJob();
+    const interval = setInterval(fetchActiveJob, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleAcceptBooking = async (bookingData) => {
@@ -129,7 +138,7 @@ export const WorkerDashboard = () => {
 
     if (bId) {
       try {
-        await api.post(`/worker/bookings/${bId}/accept`);
+        await api.post(`/bookings/${bId}/accept`);
       } catch (err) {
         console.warn('[Worker] API accept error:', err.response?.data?.message || err.message);
       }
@@ -143,10 +152,10 @@ export const WorkerDashboard = () => {
 
   const handleDeclineBooking = async () => {
     setShowIncomingAlert(false);
-    const bId = incomingBookingOffer?.bookingId;
+    const bId = incomingBookingOffer?.bookingId || incomingBookingOffer?._id;
     if (bId) {
       try {
-        await api.post(`/worker/bookings/${bId}/decline`, { reason: 'Worker declined via companion app' });
+        await api.post(`/bookings/${bId}/decline`, { reason: 'Worker declined via companion app' });
       } catch (err) {
         console.warn('[Worker] API decline error:', err.response?.data?.message || err.message);
       }
@@ -160,17 +169,17 @@ export const WorkerDashboard = () => {
 
     if (activeJob.status === 'accepted') {
       if (bId) {
-        try { await api.post(`/worker/bookings/${bId}/on-the-way`); } catch (e) {}
+        try { await api.post(`/bookings/${bId}/on-the-way`); } catch (e) {}
       }
       setActiveJob({ ...activeJob, status: 'en_route' });
     } else if (activeJob.status === 'en_route') {
       if (bId) {
-        try { await api.post(`/worker/bookings/${bId}/arrived`); } catch (e) {}
+        try { await api.post(`/bookings/${bId}/arrived`); } catch (e) {}
       }
       setActiveJob({ ...activeJob, status: 'arrived' });
     } else if (activeJob.status === 'arrived') {
       if (bId) {
-        try { await api.post(`/worker/bookings/${bId}/start-work`); } catch (e) {}
+        try { await api.post(`/bookings/${bId}/start-work`); } catch (e) {}
       }
       setActiveJob({ ...activeJob, status: 'working' });
     } else if (activeJob.status === 'working') {
@@ -192,22 +201,22 @@ export const WorkerDashboard = () => {
         <div className="flex items-center justify-between border-b border-[#E2DDD3] pb-3">
           <div className="space-y-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#C58B2A]">
-              {t('worker.dashboardTitle')} • साथी कार्यक्षेत्र
+              {language === 'hi' ? 'साथी कार्यक्षेत्र' : 'Worker Companion'}
             </span>
             <h2 className="font-serif text-lg font-bold text-[#20242A]">
-              {user?.name || 'Ramesh Kumar'}
+              {user?.name || 'Worker'}
             </h2>
           </div>
 
           <div className="flex items-center space-x-1.5">
             <span
               className={`px-3 py-1 rounded-md text-xs font-bold border ${
-                verifStatus === 'VERIFIED'
+                verifStatus === 'VERIFIED' || verifStatus === 'APPROVED'
                   ? 'bg-[#F2EFEB] text-[#3C5A48] border-[#D9D5CC]'
                   : 'bg-[#FFF8E7] text-[#C58B2A] border-[#DF9F35]'
               }`}
             >
-              {t(`worker.verifStates.${verifStatus}`) || 'Verified Member'}
+              {t(`worker.verifStates.${verifStatus}`) || (language === 'hi' ? 'सत्यापित सदस्य' : 'Verified Member')}
             </span>
           </div>
         </div>
@@ -223,7 +232,7 @@ export const WorkerDashboard = () => {
           }`}
         >
           <Power className={`w-5 h-5 ${isOnDuty ? 'text-[#DF9F35]' : 'text-[#636D79]'}`} />
-          <span>{isOnDuty ? `${t('worker.availableStatus')} • ड्यूटी पर उपस्थित` : `${t('worker.unavailableStatus')} • विश्राम पर`}</span>
+          <span>{isOnDuty ? (language === 'hi' ? 'ड्यूटी पर उपस्थित' : 'AVAILABLE FOR WORK') : (language === 'hi' ? 'विश्राम पर' : 'NOT AVAILABLE (OFF DUTY)')}</span>
         </button>
 
         <p className="text-[11px] text-[#636D79] text-center italic">
@@ -237,7 +246,7 @@ export const WorkerDashboard = () => {
           <div className="flex items-center space-x-2">
             <MapPin className="w-4 h-4 text-[#A65343]" />
             <h4 className="text-xs font-serif font-bold text-[#20242A] uppercase tracking-wider">
-              सेवा क्षेत्र दायरा (Service Radius)
+              {language === 'hi' ? 'सेवा क्षेत्र दायरा' : 'Service Radius'}
             </h4>
           </div>
           <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[#24324A] text-white">

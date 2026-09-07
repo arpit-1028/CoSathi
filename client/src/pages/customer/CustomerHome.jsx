@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const CustomerHome = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -95,7 +95,7 @@ export const CustomerHome = () => {
         </div>
         <div className="space-y-1">
           <h4 className="text-xs font-serif font-bold text-[#20242A] uppercase tracking-wider">
-            Democratic Cooperative Governance • लोकतांत्रिक निष्पक्ष आवंटन
+            {language === 'hi' ? 'लोकतांत्रिक निष्पक्ष आवंटन' : 'Democratic Cooperative Governance'}
           </h4>
           <p className="text-xs text-[#636D79] leading-relaxed">
             {t('customer.noWorkerPreBrowseNotice')}
@@ -119,7 +119,7 @@ export const CustomerHome = () => {
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#9E472A]">
-                  Selected Service / चयनित सेवा
+                  {language === 'hi' ? 'चयनित सेवा' : 'Selected Service'}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#3C5A48]"></span>
               </div>
@@ -127,7 +127,9 @@ export const CustomerHome = () => {
                 {selectedCategory} Service
               </h4>
               <p className="text-xs text-[#636D79]">
-                Click proceed to describe your problem (voice/text) and receive an instant rate-card estimate.
+                {language === 'hi'
+                  ? 'अपनी समस्या (आवाज/टेक्स्ट द्वारा) बताने और तत्काल रेट-कार्ड अनुमान पाने के लिए आगे बढ़ें।'
+                  : 'Click proceed to describe your problem (voice/text) and receive an instant rate-card estimate.'}
               </p>
             </div>
           </div>
@@ -136,20 +138,20 @@ export const CustomerHome = () => {
             onClick={() => handleRequestReady('', selectedCategory)}
             className="w-full sm:w-auto px-7 py-3 rounded-xl bg-[#9E472A] hover:bg-[#853920] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2 flex-shrink-0"
           >
-            <span>Proceed to Book {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}</span>
+            <span>{language === 'hi' ? `आगे बढ़ें: ${selectedCategory}` : `Proceed to Book ${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}`}</span>
             <ArrowRight className="w-4 h-4 text-amber-200" />
           </button>
         </div>
       )}
 
-      {/* How CoSathi Works Section (Matching Screenshot 2) */}
+      {/* How CoSathi Works Section */}
       <section id="how-it-works" className="pt-4 space-y-4">
         <div className="border-b border-[#D9D5CC] pb-3">
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#20242A]">
-            {t('common.language') === 'hi' ? 'को-साथी कैसे काम करता है' : 'How CoSathi works'}
+            {language === 'hi' ? 'को-साथी कैसे काम करता है' : 'How CoSathi works'}
           </h3>
           <p className="text-xs sm:text-sm text-[#636D79]">
-            {t('common.language') === 'hi'
+            {language === 'hi'
               ? 'बिना किसी बिचौलिये या मनमाने दामों के, पारदर्शी सहकारी सेवा'
               : 'Direct cooperative service without middleman surge or algorithmic bias'}
           </p>
@@ -159,40 +161,48 @@ export const CustomerHome = () => {
           <div className="bg-white p-5 rounded-xl border border-[#D9D5CC] shadow-xs space-y-2">
             <span className="font-mono text-2xl font-bold text-[#9E472A]">01</span>
             <h4 className="font-serif font-bold text-sm text-[#20242A]">
-              Describe the problem
+              {language === 'hi' ? 'समस्या बताएं' : 'Describe the problem'}
             </h4>
             <p className="text-xs text-[#636D79] leading-relaxed">
-              Speak or type it, in Hindi or English — no need to pick a worker yourself.
+              {language === 'hi'
+                ? 'बोलकर या लिखकर बताएं, हिंदी या अंग्रेजी में — कार्यकर्ता खुद चुनने की जरूरत नहीं।'
+                : 'Speak or type it, in Hindi or English — no need to pick a worker yourself.'}
             </p>
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-[#D9D5CC] shadow-xs space-y-2">
             <span className="font-mono text-2xl font-bold text-[#1B4278]">02</span>
             <h4 className="font-serif font-bold text-sm text-[#20242A]">
-              CoSathi understands
+              {language === 'hi' ? 'को-साथी समझता है' : 'CoSathi understands'}
             </h4>
             <p className="text-xs text-[#636D79] leading-relaxed">
-              AI identifies the actual tasks and gives an estimate from the cooperative rate card.
+              {language === 'hi'
+                ? 'AI वास्तविक कार्यों की पहचान करता है और सहकारी रेट कार्ड से अनुमान देता है।'
+                : 'AI identifies the actual tasks and gives an estimate from the cooperative rate card.'}
             </p>
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-[#D9D5CC] shadow-xs space-y-2">
             <span className="font-mono text-2xl font-bold text-[#C58B2A]">03</span>
             <h4 className="font-serif font-bold text-sm text-[#20242A]">
-              A worker is assigned
+              {language === 'hi' ? 'कार्यकर्ता आवंटित होता है' : 'A worker is assigned'}
             </h4>
             <p className="text-xs text-[#636D79] leading-relaxed">
-              The cooperative matches you with a suitable, available worker — fairly, not first-come.
+              {language === 'hi'
+                ? 'सहकारी समिति आपको उपयुक्त, उपलब्ध कार्यकर्ता से मिलाती है — निष्पक्ष रूप से।'
+                : 'The cooperative matches you with a suitable, available worker — fairly, not first-come.'}
             </p>
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-[#D9D5CC] shadow-xs space-y-2">
             <span className="font-mono text-2xl font-bold text-[#3C5A48]">04</span>
             <h4 className="font-serif font-bold text-sm text-[#20242A]">
-              Work, then the real bill
+              {language === 'hi' ? 'काम पूरा, फिर असली बिल' : 'Work, then the real bill'}
             </h4>
             <p className="text-xs text-[#636D79] leading-relaxed">
-              The final amount is set by the rate card once the work is actually done.
+              {language === 'hi'
+                ? 'काम पूरा होने पर रेट कार्ड द्वारा अंतिम राशि निर्धारित की जाती है।'
+                : 'The final amount is set by the rate card once the work is actually done.'}
             </p>
           </div>
         </div>
@@ -205,9 +215,13 @@ export const CustomerHome = () => {
             <ReceiptText className="w-4 h-4 text-[#C58B2A]" />
           </div>
           <div>
-            <h5 className="font-serif font-bold text-xs text-[#20242A]">पारदर्शी रेट कार्ड (Rate Card)</h5>
+            <h5 className="font-serif font-bold text-xs text-[#20242A]">
+              {language === 'hi' ? 'पारदर्शी रेट कार्ड' : 'Transparent Rate Card'}
+            </h5>
             <p className="text-[11px] text-[#636D79] mt-0.5 leading-relaxed">
-              Standard base rates set transparently by worker cooperatives. No arbitrary surge charges.
+              {language === 'hi'
+                ? 'सहकारी समितियों द्वारा तय मानक दरें। कोई अनपेक्षित सर्ज शुल्क नहीं।'
+                : 'Standard base rates set transparently by worker cooperatives. No arbitrary surge charges.'}
             </p>
           </div>
         </div>
@@ -217,9 +231,13 @@ export const CustomerHome = () => {
             <ShieldCheck className="w-4 h-4 text-[#3C5A48]" />
           </div>
           <div>
-            <h5 className="font-serif font-bold text-xs text-[#20242A]">सत्यापित साथी (Verified Sathis)</h5>
+            <h5 className="font-serif font-bold text-xs text-[#20242A]">
+              {language === 'hi' ? 'सत्यापित साथी' : 'Verified Sathis'}
+            </h5>
             <p className="text-[11px] text-[#636D79] mt-0.5 leading-relaxed">
-              In-person trade verification and police KYC clearance for household security.
+              {language === 'hi'
+                ? 'घरेलू सुरक्षा के लिए व्यक्तिगत ट्रेड सत्यापन और पुलिस सत्यापन।'
+                : 'In-person trade verification and police KYC clearance for household security.'}
             </p>
           </div>
         </div>
@@ -229,9 +247,13 @@ export const CustomerHome = () => {
             <HeartHandshake className="w-4 h-4 text-[#A65343]" />
           </div>
           <div>
-            <h5 className="font-serif font-bold text-xs text-[#20242A]">श्रमिक कल्याण कोष (90/10 Split)</h5>
+            <h5 className="font-serif font-bold text-xs text-[#20242A]">
+              {language === 'hi' ? 'श्रमिक कल्याण कोष (90/10 बंटवारा)' : 'Worker Welfare Fund (90/10 Split)'}
+            </h5>
             <p className="text-[11px] text-[#636D79] mt-0.5 leading-relaxed">
-              90% goes directly to the worker. 10% funds cooperative welfare, pensions, and insurance.
+              {language === 'hi'
+                ? '90% सीधे कार्यकर्ता को जाता है। 10% सहकारी कल्याण, पेंशन और सुरक्षा निधि में।'
+                : '90% goes directly to the worker. 10% funds cooperative welfare, pensions, and insurance.'}
             </p>
           </div>
         </div>

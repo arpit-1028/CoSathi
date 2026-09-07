@@ -239,6 +239,7 @@ export const hi = {
       PENDING: "समीक्षाधीन (लंबित)",
       PROVISIONAL: "अनंतिम (नया सदस्य)",
       VERIFIED: "सत्यापित सदस्य",
+      APPROVED: "सत्यापित सदस्य",
       SUSPENDED: "निलंबित",
     },
 
