@@ -690,7 +690,7 @@ const runSeed = async () => {
       qualityRating: 5,
       behaviorRating: 5,
       comment: 'Very polite worker, arrived on time with cooperative ID card and fixed capacitor quickly.',
-      tags: ['Punctual', 'Cooperative Verified', 'Clean Work'],
+      tags: ['On time', 'Professional', 'Clean work'],
       cooperativeBadge: 'Master Technician',
     });
 
@@ -724,15 +724,23 @@ const runSeed = async () => {
     await DemandForecast.create({
       cooperative: cooperative._id,
       zone: 'South Delhi',
+      serviceCategory: 'electrical',
       category: catMap['electrical'],
       forecastDate: new Date('2026-09-06'),
+      dayOfWeek: 'Sunday',
+      predictedDemand: 28,
       predictedBookingVolume: 28,
+      availableCapacity: 20,
+      capacityGap: 8,
+      growthTrendPercent: 14.5,
+      recommendation: 'Allocate 8 additional electrical technicians for South Delhi zone.',
       confidenceScore: 0.89,
+      explanation: 'Monsoon humidity and weekend schedule driven demand peak.',
       factors: {
         season: 'Late Monsoon / High Humidity',
         isWeekend: true,
         historicalAverage: 24,
-        workerSupplyAvailable: 15,
+        workerSupplyAvailable: 20,
       },
     });
 

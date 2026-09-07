@@ -14,7 +14,10 @@ let ioInstance = null;
 const initSocket = (server) => {
   ioInstance = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        callback(null, origin);
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
