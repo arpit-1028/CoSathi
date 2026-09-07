@@ -8,7 +8,14 @@ export const SlotAndAddressStep = ({ onConfirmSchedule, onBack, initialAddress =
   const { t } = useLanguage();
   const { profile } = useAuth();
 
-  const [selectedDate, setSelectedDate] = useState('today');
+  const now = new Date();
+  const todayFormatted = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const tomorrowDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowFormatted = tomorrowDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const todayISO = now.toISOString().split('T')[0];
+
+  const [dateSelectionType, setDateSelectionType] = useState('today');
+  const [customDate, setCustomDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('02:00 PM - 04:00 PM');
   const [mapArea, setMapArea] = useState(
     initialAddress || profile?.defaultAddress?.street || 'Lajpat Nagar II, New Delhi, 110024'
@@ -27,6 +34,16 @@ export const SlotAndAddressStep = ({ onConfirmSchedule, onBack, initialAddress =
     { id: 'evening', label: t('customer.slotEvening') },
   ];
 
+  const getSelectedDateString = () => {
+    if (dateSelectionType === 'today') return `Today (${todayFormatted})`;
+    if (dateSelectionType === 'tomorrow') return `Tomorrow (${tomorrowFormatted})`;
+    if (dateSelectionType === 'custom' && customDate) {
+      const d = new Date(customDate);
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return `Today (${todayFormatted})`;
+  };
+
   const getCombinedAddress = () => {
     const parts = [];
     if (houseNo.trim()) parts.push(houseNo.trim());
@@ -39,7 +56,7 @@ export const SlotAndAddressStep = ({ onConfirmSchedule, onBack, initialAddress =
     e.preventDefault();
     const finalAddress = getCombinedAddress();
     onConfirmSchedule({
-      date: selectedDate,
+      date: getSelectedDateString(),
       timeSlot: selectedSlot,
       address: finalAddress,
       coordinates,
@@ -55,33 +72,54 @@ export const SlotAndAddressStep = ({ onConfirmSchedule, onBack, initialAddress =
           <span>{t('customer.scheduleTitle')} • सेवा समय निर्धारण</span>
         </h3>
 
-        {/* Date Selector */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Dynamic Date Selector */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <button
             type="button"
-            onClick={() => setSelectedDate('today')}
+            onClick={() => setDateSelectionType('today')}
             className={`p-3 rounded-lg border text-center transition-all flex flex-col items-center space-y-0.5 ${
-              selectedDate === 'today'
+              dateSelectionType === 'today'
                 ? 'bg-[#24324A] text-white border-[#162031] font-bold shadow-xs'
                 : 'bg-[#F7F4EE] border-[#D9D5CC] text-[#20242A] hover:bg-[#F2EFEB]'
             }`}
           >
             <span className="text-xs">{t('customer.dateToday')}</span>
-            <span className="text-sm font-serif font-bold">5 Sep 2026</span>
+            <span className="text-sm font-serif font-bold">{todayFormatted}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setSelectedDate('tomorrow')}
+            onClick={() => setDateSelectionType('tomorrow')}
             className={`p-3 rounded-lg border text-center transition-all flex flex-col items-center space-y-0.5 ${
-              selectedDate === 'tomorrow'
+              dateSelectionType === 'tomorrow'
                 ? 'bg-[#24324A] text-white border-[#162031] font-bold shadow-xs'
                 : 'bg-[#F7F4EE] border-[#D9D5CC] text-[#20242A] hover:bg-[#F2EFEB]'
             }`}
           >
             <span className="text-xs">{t('customer.dateTomorrow')}</span>
-            <span className="text-sm font-serif font-bold">6 Sep 2026</span>
+            <span className="text-sm font-serif font-bold">{tomorrowFormatted}</span>
           </button>
+
+          <div
+            onClick={() => setDateSelectionType('custom')}
+            className={`p-2.5 rounded-lg border text-center transition-all flex flex-col justify-center cursor-pointer ${
+              dateSelectionType === 'custom'
+                ? 'bg-[#24324A] text-white border-[#162031] font-bold shadow-xs'
+                : 'bg-[#F7F4EE] border-[#D9D5CC] text-[#20242A] hover:bg-[#F2EFEB]'
+            }`}
+          >
+            <span className="text-xs mb-1">Pick Date (अन्य तारीख)</span>
+            <input
+              type="date"
+              min={todayISO}
+              value={customDate}
+              onChange={(e) => {
+                setCustomDate(e.target.value);
+                setDateSelectionType('custom');
+              }}
+              className="text-xs p-1 rounded border border-[#D9D5CC] text-[#20242A] bg-white w-full"
+            />
+          </div>
         </div>
 
         {/* Time Slot Selector */}
@@ -134,23 +172,30 @@ export const SlotAndAddressStep = ({ onConfirmSchedule, onBack, initialAddress =
           </button>
         </div>
 
-        {/* 1. Google Maps Picked Area (Read-only badge/preview with change trigger) */}
-        <div className="p-3 bg-[#F7F4EE] rounded-lg border border-[#D9D5CC] space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#636D79] flex items-center space-x-1">
-              <MapPin className="w-3 h-3 text-[#3C5A48]" />
-              <span>Google Maps Verified Area / इलाका</span>
-            </span>
+        {/* 1. Directly Editable Area, Locality or City */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-bold text-[#20242A] uppercase">
+              Area, Locality or City (क्षेत्र / इलाका) <span className="text-[#A65343]">*</span>
+            </label>
             <button
               type="button"
               onClick={() => setIsMapModalOpen(true)}
-              className="text-[11px] font-bold text-[#A65343] hover:underline"
+              className="text-[11px] font-bold text-[#A65343] hover:underline flex items-center space-x-1"
             >
-              Change Area
+              <Navigation className="w-3 h-3 text-[#A65343]" />
+              <span>Pick on Map / GPS</span>
             </button>
           </div>
-          <p className="text-xs font-semibold text-[#20242A]">{mapArea}</p>
-          <div className="flex items-center space-x-1.5 pt-0.5 font-mono text-[10px] text-[#3C5A48]">
+          <input
+            type="text"
+            required
+            placeholder="e.g. Modinagar, Ghaziabad or Lajpat Nagar, Delhi"
+            value={mapArea}
+            onChange={(e) => setMapArea(e.target.value)}
+            className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-[#D9D5CC] focus:outline-none focus:border-[#24324A] bg-white text-[#20242A]"
+          />
+          <div className="flex items-center space-x-1.5 pt-1.5 font-mono text-[10px] text-[#3C5A48]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#3C5A48]" />
             <span>GPS: [{coordinates[0].toFixed(4)}, {coordinates[1].toFixed(4)}] • Verified Coordinates</span>
           </div>

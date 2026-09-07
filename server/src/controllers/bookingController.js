@@ -115,12 +115,30 @@ const createBooking = async (req, res, next) => {
     // 1. Prevent Customer Double-Booking for overlapping slot
     const existingConflict = await checkCustomerDoubleBooking(customerId, startDate, endDate);
     if (existingConflict) {
-      return res.status(409).json({
-        success: false,
-        message: `Double booking prevented: You already have an active service booking (${existingConflict.bookingNumber}) scheduled in this time window.`,
-        conflictBookingId: existingConflict._id,
-        conflictBookingNumber: existingConflict.bookingNumber,
-      });
+      const pendingStatuses = [
+        BOOKING_STATES.MATCHING,
+        BOOKING_STATES.OFFERED,
+        BOOKING_STATES.DRAFT,
+        BOOKING_STATES.UNFULFILLED,
+      ];
+      if (pendingStatuses.includes(existingConflict.status)) {
+        // Auto-supersede stale pending/unaccepted booking request so customer is never locked out
+        try {
+          existingConflict.status = BOOKING_STATES.CANCELLED;
+          existingConflict.cancellationReason = 'Superseded by new booking request';
+          existingConflict.cancelledBy = customerId;
+          await existingConflict.save();
+        } catch (e) {
+          console.warn('Notice: auto-cancelling pending conflict booking:', e.message);
+        }
+      } else {
+        return res.status(409).json({
+          success: false,
+          message: `Double booking prevented: You already have an active service booking (${existingConflict.bookingNumber}) in progress.`,
+          conflictBookingId: existingConflict._id,
+          conflictBookingNumber: existingConflict.bookingNumber,
+        });
+      }
     }
 
     // 2. Resolve Service Category

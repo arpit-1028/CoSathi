@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import {
   Clock,
@@ -9,42 +11,78 @@ import {
   RotateCcw,
   Star,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 
 export const BookingHistory = () => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   useEffect(() => {
-    // Combine seeded history with any completed during this session
-    const local = JSON.parse(localStorage.getItem('cosathi_history') || '[]');
-    const seeded = [
-      {
-        bookingNumber: 'CS-2026-0905-001',
-        category: 'electrical',
-        serviceTitle: 'Ceiling Fan Repair / Capacitor Replace',
-        date: '05 Sep 2026',
-        workerName: 'Ramesh Kumar (Worker A)',
-        amount: 199,
-        status: 'completed',
-        rating: 5,
-      },
-      {
-        bookingNumber: 'CS-2026-0828-042',
-        category: 'plumbing',
-        serviceTitle: 'Water Tap Leakage Fix / Spindle Change',
-        date: '28 Aug 2026',
-        workerName: 'Amit Sharma (Plumber)',
-        amount: 149,
-        status: 'completed',
-        rating: 5,
-      },
-    ];
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get('/bookings/my');
+        if (res.data?.success && Array.isArray(res.data.bookings)) {
+          const apiBookings = res.data.bookings.map((b) => ({
+            id: b._id,
+            bookingNumber: b.bookingNumber,
+            category: b.category?.slug || 'general',
+            serviceTitle:
+              b.requirementInput?.parsedTasks?.[0]?.title ||
+              b.requirementInput?.rawVoiceTranscript ||
+              'Cooperative Household Service',
+            date: new Date(b.createdAt).toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            }),
+            workerName: (b.assignedWorker || b.workerId)?.name || 'Cooperative Worker',
+            amount: b.finalPrice || b.initialEstimate || 199,
+            status: b.status?.toLowerCase() || 'completed',
+          }));
 
-    setBookings([...local, ...seeded]);
-  }, []);
+          const local = JSON.parse(localStorage.getItem('cosathi_history') || '[]');
+          const combined = [...apiBookings, ...local];
+
+          // Deduplicate by bookingNumber
+          const uniqueMap = new Map();
+          combined.forEach((item) => {
+            if (item.bookingNumber && !uniqueMap.has(item.bookingNumber)) {
+              uniqueMap.set(item.bookingNumber, item);
+            }
+          });
+          const uniqueBookings = Array.from(uniqueMap.values());
+
+          // Only show sample demo records if it is specifically the demo user Aarav and has zero records
+          if (uniqueBookings.length === 0 && user?.phone === '9876543210') {
+            setBookings([
+              {
+                bookingNumber: 'CS-2026-0905-001',
+                category: 'electrical',
+                serviceTitle: 'Ceiling Fan Repair / Capacitor Replace',
+                date: '05 Sep 2026',
+                workerName: 'Ramesh Kumar (Worker A)',
+                amount: 199,
+                status: 'completed',
+              },
+            ]);
+          } else {
+            setBookings(uniqueBookings);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load history:', err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [user]);
 
   const handleRebook = (item) => {
     navigate('/customer/book', {
@@ -70,7 +108,12 @@ export const BookingHistory = () => {
         </Link>
       </div>
 
-      {bookings.length === 0 ? (
+      {loading ? (
+        <div className="p-12 text-center bg-white rounded-3xl border border-cosathi-border">
+          <Loader2 className="w-8 h-8 text-cosathi-forest animate-spin mx-auto mb-3" />
+          <p className="text-sm font-medium text-cosathi-muted">Loading your booking history...</p>
+        </div>
+      ) : bookings.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-cosathi-border">
           <Clock className="w-12 h-12 text-cosathi-muted mx-auto mb-3 opacity-40" />
           <p className="text-sm font-medium text-cosathi-muted">{t('history.noBookings')}</p>

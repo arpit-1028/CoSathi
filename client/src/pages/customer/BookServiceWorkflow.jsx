@@ -181,6 +181,12 @@ export const BookServiceWorkflow = () => {
       }
     } catch (err) {
       console.warn('[Workflow] Auto-creating backend booking notice:', err.response?.data?.message || err.message);
+      if (err.response?.data?.conflictBookingId) {
+        setBookingId(err.response.data.conflictBookingId);
+        if (err.response.data.conflictBookingNumber) {
+          setBookingNumber(err.response.data.conflictBookingNumber);
+        }
+      }
     }
   };
 
@@ -439,15 +445,17 @@ export const BookServiceWorkflow = () => {
         <MatchingRadarStep
           bookingId={bookingId}
           onMatched={handleWorkerMatched}
+          onCancel={() => navigate('/customer/home')}
         />
       )}
 
       {/* STEP 5: Active Booking Tracker & Worker Revealed */}
       {currentStep === 5 && (
         <ActiveBookingTracker
-          bookingData={{ bookingNumber }}
+          bookingData={{ _id: bookingId, bookingNumber }}
           workerData={assignedWorker}
           onCompleteJob={handleJobCompleted}
+          onCancelBooking={() => navigate('/customer/home')}
         />
       )}
 

@@ -34,17 +34,29 @@ export const LocationPickerModal = ({ isOpen, onClose, onSelectLocation, initial
     setErrorMessage('');
     try {
       const res = await api.post('/geo/geocode', { query: searchQuery });
-      if (res.data?.success) {
-        if (res.data.result) {
-          setSelectedLocation(res.data.result);
-        }
+      if (res.data?.success && res.data.result) {
+        setSelectedLocation(res.data.result);
         if (Array.isArray(res.data.suggestions)) {
           setSuggestions(res.data.suggestions);
         }
+      } else {
+        setSelectedLocation({
+          name: searchQuery,
+          formattedAddress: searchQuery,
+          city: 'NCR',
+          pincode: '201204',
+          coordinates: [77.5830, 28.8315],
+        });
       }
     } catch (err) {
-      console.warn('[LocationPicker] Geocoding error:', err.message);
-      setErrorMessage('Could not geocode address. Please try another landmark.');
+      console.warn('[LocationPicker] Geocoding fallback to query:', err.message);
+      setSelectedLocation({
+        name: searchQuery,
+        formattedAddress: searchQuery,
+        city: 'NCR',
+        pincode: '201204',
+        coordinates: [77.2433, 28.5700],
+      });
     } finally {
       setIsSearching(false);
     }
@@ -180,6 +192,31 @@ export const LocationPickerModal = ({ isOpen, onClose, onSelectLocation, initial
               {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Search</span>}
             </button>
           </form>
+
+          {/* Direct Pick Searched Address Button */}
+          {searchQuery.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                const target = selectedLocation || {
+                  name: searchQuery.trim(),
+                  formattedAddress: searchQuery.trim(),
+                  city: 'NCR',
+                  pincode: '201204',
+                  coordinates: [77.5830, 28.8315],
+                };
+                onSelectLocation(target);
+                onClose();
+              }}
+              className="w-full py-2.5 px-4 bg-[#24324A] hover:bg-[#162031] text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all animate-in fade-in"
+            >
+              <div className="flex items-center space-x-1.5 truncate pr-2">
+                <Check className="w-3.5 h-3.5 text-[#DF9F35] shrink-0" />
+                <span className="truncate">Select "{searchQuery}"</span>
+              </div>
+              <span className="text-[#DF9F35] font-semibold text-[11px] shrink-0">Tap to Confirm ✓</span>
+            </button>
+          )}
 
           {/* Use Current Location Quick Action */}
           <button

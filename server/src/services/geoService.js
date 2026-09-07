@@ -75,7 +75,15 @@ const NCR_LOCAL_CATALOGUE = [
     city: 'Ghaziabad',
     pincode: '201014',
     coordinates: [77.3713, 28.6415],
-    keywords: ['indirapuram', 'vaishali', 'ghaziabad', 'shipra'],
+    keywords: ['indirapuram', 'vaishali', 'ghaziabad', 'shipra', 'vasundhara'],
+  },
+  {
+    name: 'Modinagar Ghaziabad',
+    formattedAddress: 'Modinagar, Ghaziabad, Uttar Pradesh, 201204',
+    city: 'Ghaziabad',
+    pincode: '201204',
+    coordinates: [77.5830, 28.8315],
+    keywords: ['modinagar', 'modi nagar', 'srm', 'delhi meerut road', 'muradnagar'],
   },
   {
     name: 'Cyber City Gurugram',

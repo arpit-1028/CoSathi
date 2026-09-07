@@ -39,6 +39,7 @@ const getOverview = async (req, res, next) => {
       .limit(10)
       .populate('customer', 'name phone')
       .populate('assignedWorker', 'name phone')
+      .populate('workerId', 'name phone')
       .populate('category', 'name slug');
 
     res.status(200).json({
@@ -52,16 +53,20 @@ const getOverview = async (req, res, next) => {
         cooperativeFund: cooperative?.welfareFundBalance || 175000,
         societyName: cooperative?.name || 'Delhi Shramik Kalyan Sahakari Samiti Ltd.',
       },
-      liveOperations: liveBookings.map((b) => ({
-        bookingId: b.bookingNumber,
-        service: b.requirementInput?.parsedTasks[0]?.title || 'Electrical Diagnostic',
-        category: b.category?.name?.en || 'Electrical Works',
-        worker: b.assignedWorker?.name || 'Ramesh Kumar (Worker A)',
-        area: b.location?.addressLine || 'Lajpat Nagar II',
-        status: b.status,
-        amount: b.finalPrice || b.initialEstimate || 199,
-        time: b.createdAt,
-      })),
+      liveOperations: liveBookings.map((b) => {
+        const workerObj = b.assignedWorker || b.workerId;
+        return {
+          bookingId: b.bookingNumber,
+          service: b.requirementInput?.parsedTasks?.[0]?.title || b.requirementInput?.rawVoiceTranscript || 'Household Service',
+          category: b.category?.name?.en || 'Cooperative Service',
+          worker: workerObj ? workerObj.name : (b.status === 'MATCHING' ? 'Fair Match Algorithm In Progress' : 'Unassigned'),
+          workerPhone: workerObj?.phone || '',
+          area: b.location?.addressLine || b.address?.addressLine || 'Delhi NCR',
+          status: b.status,
+          amount: b.finalPrice || b.initialEstimate || 199,
+          time: b.createdAt,
+        };
+      }),
     });
   } catch (error) {
     next(error);
@@ -547,6 +552,7 @@ const getBookings = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .populate('customer', 'name phone email')
       .populate('assignedWorker', 'name phone')
+      .populate('workerId', 'name phone')
       .populate('category', 'name slug');
 
     res.status(200).json({

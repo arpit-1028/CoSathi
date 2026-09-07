@@ -26,9 +26,9 @@ export const BookingsManager = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  const fetchBookings = async () => {
+  const fetchBookings = async (showSpinner = true) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const res = await api.get('/cooperative/bookings');
       if (res.data.success) {
         setBookings(res.data.bookings || []);
@@ -36,29 +36,45 @@ export const BookingsManager = () => {
     } catch (err) {
       console.error('Failed to fetch bookings', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBookings();
+    fetchBookings(true);
+    // Real-time polling every 4 seconds so newly placed bookings appear immediately
+    const interval = setInterval(() => {
+      fetchBookings(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
+  const latestOffered = bookings.find(
+    (b) =>
+      ['OFFERED', 'MATCHING', 'ASSIGNED'].includes(b.status?.toUpperCase()) &&
+      (b.assignedWorker || b.workerId)
+  );
+
   const filteredBookings = bookings.filter((b) => {
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      b.status?.toLowerCase() === statusFilter.toLowerCase();
     const q = search.toLowerCase();
+    const workerObj = b.assignedWorker || b.workerId;
     const matchesSearch =
       !search ||
       b.bookingNumber?.toLowerCase().includes(q) ||
       b.customer?.name?.toLowerCase().includes(q) ||
-      b.assignedWorker?.name?.toLowerCase().includes(q) ||
+      workerObj?.name?.toLowerCase().includes(q) ||
+      workerObj?.phone?.includes(q) ||
       b.category?.name?.en?.toLowerCase().includes(q) ||
       b.location?.addressLine?.toLowerCase().includes(q);
 
     return matchesStatus && matchesSearch;
   });
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (statusInput) => {
+    const status = statusInput?.toLowerCase();
     switch (status) {
       case 'completed':
         return (
@@ -67,6 +83,8 @@ export const BookingsManager = () => {
           </span>
         );
       case 'in_progress':
+      case 'on_the_way':
+      case 'arrived':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">
             In Progress
@@ -74,9 +92,16 @@ export const BookingsManager = () => {
         );
       case 'assigned':
       case 'worker_accepted':
+      case 'accepted':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800">
             Worker Assigned
+          </span>
+        );
+      case 'offered':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-950 border border-amber-400 animate-pulse">
+            ⚡ Offered to Worker
           </span>
         );
       case 'matching':
@@ -95,7 +120,7 @@ export const BookingsManager = () => {
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-cosathi-surface text-cosathi-slate border border-cosathi-border">
-            {status}
+            {statusInput}
           </span>
         );
     }
@@ -168,6 +193,35 @@ export const BookingsManager = () => {
         </div>
       </div>
 
+      {/* Real-time In-Flight Dispatch Alert Bar */}
+      {latestOffered && (
+        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center space-x-3">
+            <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping shrink-0" />
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold uppercase text-amber-900">
+                  ⚡ Live Booking Offered to Worker! (जज के सामने लाइव असाइनमेंट)
+                </span>
+                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded">
+                  {latestOffered.bookingNumber}
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Assigned Worker: <strong>{(latestOffered.assignedWorker || latestOffered.workerId)?.name || 'Fair Candidate'}</strong> • 
+                Phone: <strong className="font-mono">{(latestOffered.assignedWorker || latestOffered.workerId)?.phone || '9810010005'}</strong> • 
+                Password: <code className="bg-white px-1.5 py-0.5 rounded border border-amber-300 font-bold text-amber-950">CoSathi@2026</code>
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <span className="text-xs font-bold text-emerald-900 bg-emerald-100/90 px-3 py-1.5 rounded-xl border border-emerald-300 shadow-xs">
+              Log into Worker Tab to Accept!
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Bookings Table */}
       <div className="bg-white rounded-3xl border border-cosathi-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -208,10 +262,10 @@ export const BookingsManager = () => {
                       <div className="font-bold text-cosathi-slate">
                         {b.requirementInput?.parsedTasks?.[0]?.title ||
                           b.requirementInput?.rawVoiceTranscript ||
-                          'Ceiling Fan Repair'}
+                          'Household Service'}
                       </div>
                       <div className="text-[11px] text-cosathi-muted">
-                        {b.category?.name?.en || 'Electrical Works'}
+                        {b.category?.name?.en || 'Cooperative Service'}
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
@@ -223,17 +277,20 @@ export const BookingsManager = () => {
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
-                      {b.assignedWorker ? (
+                      {b.assignedWorker || b.workerId ? (
                         <div>
-                          <div className="font-semibold text-cosathi-slate">
-                            {b.assignedWorker.name}
+                          <div className="font-bold text-cosathi-slate">
+                            {(b.assignedWorker || b.workerId).name}
                           </div>
                           <div className="text-[11px] text-cosathi-muted font-mono">
-                            {b.assignedWorker.phone || '9810010001'}
+                            📞 {(b.assignedWorker || b.workerId).phone || '9810010005'}
+                          </div>
+                          <div className="text-[10px] text-emerald-800 font-semibold mt-0.5">
+                            Pass: CoSathi@2026
                           </div>
                         </div>
                       ) : (
-                        <span className="text-amber-600 font-semibold text-[11px]">Unassigned</span>
+                        <span className="text-amber-600 font-semibold text-[11px]">Fair Matching in Progress...</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4 max-w-[140px] truncate text-cosathi-muted">

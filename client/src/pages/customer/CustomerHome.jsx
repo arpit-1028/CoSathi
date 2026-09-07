@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { ServiceCategoriesGrid } from '../../components/customer/ServiceCategoriesGrid';
@@ -20,6 +21,26 @@ export const CustomerHome = () => {
   const navigate = useNavigate();
 
   const [selectedCategory, setSelectedCategory] = useState('electrical');
+  const [activeBooking, setActiveBooking] = useState(null);
+
+  useEffect(() => {
+    const fetchActiveBooking = async () => {
+      try {
+        const res = await api.get('/bookings/my');
+        if (res.data?.success && Array.isArray(res.data.bookings)) {
+          const active = res.data.bookings.find((b) =>
+            ['MATCHING', 'OFFERED', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'].includes(
+              b.status?.toUpperCase()
+            )
+          );
+          setActiveBooking(active || null);
+        }
+      } catch (err) {
+        setActiveBooking(null);
+      }
+    };
+    fetchActiveBooking();
+  }, []);
 
   const handleCategorySelect = (catSlug) => {
     setSelectedCategory(catSlug);
@@ -37,27 +58,29 @@ export const CustomerHome = () => {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
-      {/* Active Booking Top Notification Pill (If exists) */}
-      <div className="p-4 rounded-xl bg-[#FFFFFF] border border-[#D9D5CC] shadow-xs flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#3C5A48] animate-pulse" />
-          <div>
-            <span className="text-xs font-serif font-bold text-[#20242A] block">
-              {t('customer.activeBookingAlert')}
-            </span>
-            <span className="text-[11px] text-[#636D79]">
-              Booking #CS-2026-0905-081 • Electrician Dispatched
-            </span>
+      {/* Active Booking Top Notification Pill (Strictly shown only if an active booking actually exists) */}
+      {activeBooking && (
+        <div className="p-4 rounded-xl bg-[#FFFFFF] border border-[#D9D5CC] shadow-xs flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center space-x-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#3C5A48] animate-pulse" />
+            <div>
+              <span className="text-xs font-serif font-bold text-[#20242A] block">
+                {t('customer.activeBookingAlert')}
+              </span>
+              <span className="text-[11px] text-[#636D79]">
+                Booking #{activeBooking.bookingNumber} • {activeBooking.category?.name?.en || 'Service'} ({activeBooking.status})
+              </span>
+            </div>
           </div>
+          <Link
+            to="/customer/book"
+            className="px-3.5 py-1.5 rounded-lg bg-[#24324A] hover:bg-[#162031] text-white text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-xs"
+          >
+            <span>{t('customer.viewLiveStatus')}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#DF9F35]" />
+          </Link>
         </div>
-        <Link
-          to="/customer/book"
-          className="px-3.5 py-1.5 rounded-lg bg-[#24324A] hover:bg-[#162031] text-white text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-xs"
-        >
-          <span>{t('customer.viewLiveStatus')}</span>
-          <ArrowRight className="w-3.5 h-3.5 text-[#DF9F35]" />
-        </Link>
-      </div>
+      )}
 
       {/* Hero Voice & Text Request Widget */}
       <VoiceRequestWidget

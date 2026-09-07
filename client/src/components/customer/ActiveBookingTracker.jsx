@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { EnRouteMapTracker } from './EnRouteMapTracker';
 import {
@@ -21,6 +22,7 @@ export const ActiveBookingTracker = ({
   bookingData,
   workerData,
   onCompleteJob,
+  onCancelBooking,
 }) => {
   const { t } = useLanguage();
 
@@ -191,6 +193,29 @@ export const ActiveBookingTracker = ({
           >
             <MessageSquare className="w-3.5 h-3.5 text-[#A65343]" />
             <span>{t('customer.chatWorker')}</span>
+          </button>
+        </div>
+
+        {/* Cancel Booking Action */}
+        <div className="pt-2 border-t border-[#E2DDD3]">
+          <button
+            type="button"
+            onClick={async () => {
+              if (window.confirm('Are you sure you want to cancel this booking? / क्या आप यह बुकिंग रद्द करना चाहते हैं?')) {
+                try {
+                  const bId = bookingData?._id || bookingData?.bookingId;
+                  if (bId) {
+                    await api.post(`/bookings/${bId}/cancel`, { reason: 'Cancelled by customer' });
+                  }
+                } catch (e) {
+                  console.warn('Cancel error:', e.message);
+                }
+                if (onCancelBooking) onCancelBooking();
+              }
+            }}
+            className="w-full py-2.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors text-center"
+          >
+            ✕ Cancel Booking / बुकिंग रद्द करें
           </button>
         </div>
       </div>

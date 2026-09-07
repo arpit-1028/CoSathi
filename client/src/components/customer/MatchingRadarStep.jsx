@@ -1,13 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { useSocket } from '../../context/SocketContext';
 import { Scale, Users, ShieldCheck, CheckCircle2, Sparkles, Radio } from 'lucide-react';
 
-export const MatchingRadarStep = ({ bookingId, onMatched }) => {
+export const MatchingRadarStep = ({ bookingId, onMatched, onCancel }) => {
   const { t } = useLanguage();
   const { socket, joinBooking } = useSocket();
   const [seconds, setSeconds] = useState(45);
   const [statusText, setStatusText] = useState('Finding nearest certified cooperative worker...');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancelSearch = async () => {
+    if (!window.confirm('Are you sure you want to cancel this service request? / क्या आप यह सेवा अनुरोध रद्द करना चाहते हैं?')) {
+      return;
+    }
+    setIsCancelling(true);
+    try {
+      if (bookingId) {
+        await api.post(`/bookings/${bookingId}/cancel`, { reason: 'Customer cancelled during matching search' });
+      }
+    } catch (err) {
+      console.warn('Cancel warning:', err.message);
+    } finally {
+      setIsCancelling(false);
+      if (onCancel) onCancel();
+    }
+  };
 
   // Simulated cooperative worker match fallback
   const fallbackWorker = {
@@ -131,6 +150,18 @@ export const MatchingRadarStep = ({ bookingId, onMatched }) => {
           className="font-semibold text-[#A65343] hover:underline"
         >
           Fast-forward Matching (Demo) →
+        </button>
+      </div>
+
+      {/* Cancel Search Button */}
+      <div className="pt-2 text-center">
+        <button
+          type="button"
+          onClick={handleCancelSearch}
+          disabled={isCancelling}
+          className="w-full py-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all"
+        >
+          {isCancelling ? 'Cancelling request...' : '✕ Cancel Search / अनुरोध रद्द करें'}
         </button>
       </div>
     </div>
