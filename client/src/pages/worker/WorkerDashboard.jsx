@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export const WorkerDashboard = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, profile } = useAuth();
   const { socket, isConnected } = useSocket();
 
