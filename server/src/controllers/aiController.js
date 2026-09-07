@@ -12,7 +12,7 @@ const {
  */
 const interpretRequest = async (req, res, next) => {
   try {
-    const { text, transcription } = req.body;
+    const { text, transcription, category } = req.body;
     const inputContent = text || transcription;
 
     if (!inputContent || !inputContent.trim()) {
@@ -22,7 +22,7 @@ const interpretRequest = async (req, res, next) => {
       });
     }
 
-    const interpretation = await interpretCustomerRequest(inputContent);
+    const interpretation = await interpretCustomerRequest(inputContent, category);
 
     res.status(200).json({
       success: true,

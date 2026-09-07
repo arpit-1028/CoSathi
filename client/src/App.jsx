@@ -59,20 +59,36 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#F7F4EE] p-4">
-          <div className="bg-white p-8 rounded-2xl border border-[#D9D5CC] shadow-md max-w-md text-center space-y-4">
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#D9D5CC] shadow-md max-w-md text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-xl font-bold">
+              !
+            </div>
             <h3 className="font-serif text-xl font-bold text-[#20242A]">Something went wrong</h3>
             <p className="text-xs text-[#636D79]">
-              An unexpected display issue occurred. Click reload to refresh your session.
+              {this.state.error?.message || 'An unexpected display issue occurred. Click reload to refresh your session.'}
             </p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false });
-                window.location.reload();
-              }}
-              className="px-6 py-2.5 bg-[#1B4278] hover:bg-[#122A4E] text-white text-xs font-bold rounded-xl transition-all shadow-sm"
-            >
-              Reload Page
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="px-5 py-2.5 bg-[#1B4278] hover:bg-[#122A4E] text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+              >
+                Reload Page
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('cosathi_token');
+                  localStorage.removeItem('cosathi_user');
+                  this.setState({ hasError: false, error: null });
+                  window.location.href = '/login';
+                }}
+                className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-all shadow-sm"
+              >
+                Reset Session & Login
+              </button>
+            </div>
           </div>
         </div>
       );

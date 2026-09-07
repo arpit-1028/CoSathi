@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Star, Heart, Check, ArrowRight } from 'lucide-react';
 
-export const ReviewModal = ({ workerName = 'Ramesh Kumar', onSubmitReview }) => {
+export const ReviewModal = ({ workerName = 'Cooperative Sathi', onSubmitReview }) => {
   const { t } = useLanguage();
   const [overallRating, setOverallRating] = useState(5);
   const [punctuality, setPunctuality] = useState(5);

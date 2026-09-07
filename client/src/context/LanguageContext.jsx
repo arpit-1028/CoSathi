@@ -34,8 +34,10 @@ export const LanguageProvider = ({ children }) => {
   };
 
   const t = (keyPath) => {
+    if (!keyPath || typeof keyPath !== 'string') return '';
+    const activeLang = translations[language] ? language : 'en';
     const keys = keyPath.split('.');
-    let value = translations[language];
+    let value = translations[activeLang];
     for (const key of keys) {
       if (value && value[key] !== undefined) {
         value = value[key];
@@ -49,8 +51,13 @@ export const LanguageProvider = ({ children }) => {
             return keyPath;
           }
         }
-        return fallback;
+        value = fallback;
+        break;
       }
+    }
+    // Prevent React render crash: never return an object to JSX
+    if (typeof value === 'object' && value !== null) {
+      return keyPath;
     }
     return value;
   };

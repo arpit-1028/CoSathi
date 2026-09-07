@@ -57,22 +57,22 @@ const calculateInitialEstimate = async (tasksInput = []) => {
 
     if (code === 'NEEDS_REVIEW' || !code) {
       // Unlisted / custom task flagged for on-site diagnostic
-      const defaultDiagnosticPrice = 150;
-      const minDiag = 100;
-      const maxDiag = 250;
-      calculatedBaseTotal += defaultDiagnosticPrice * quantity;
+      const baseDiag = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
+      const minDiag = Math.round(baseDiag * 0.85);
+      const maxDiag = Math.round(baseDiag * 1.25);
+      calculatedBaseTotal += baseDiag * quantity;
       calculatedMinTotal += minDiag * quantity;
       calculatedMaxTotal += maxDiag * quantity;
 
       itemizedDetails.push({
         code: 'NEEDS_REVIEW',
-        name: raw.label || raw.title || 'Custom On-Site Diagnostic / Custom Task',
-        nameHindi: 'साइट पर जांच / विशेष कार्य',
-        unitPrice: defaultDiagnosticPrice,
+        name: raw.label || raw.title || 'Cooperative Service Task',
+        nameHindi: 'सहकारी सेवा कार्य',
+        unitPrice: baseDiag,
         minPrice: minDiag,
         maxPrice: maxDiag,
         quantity,
-        subtotal: defaultDiagnosticPrice * quantity,
+        subtotal: baseDiag * quantity,
         minSubtotal: minDiag * quantity,
         maxSubtotal: maxDiag * quantity,
         unit: 'fixed',
@@ -113,10 +113,10 @@ const calculateInitialEstimate = async (tasksInput = []) => {
         needsReview: false,
       });
     } else {
-      // Unknown code in system: safe fallback with review flag
-      const fallbackPrice = 199;
-      const minP = 150;
-      const maxP = 300;
+      // Unknown code in system: dynamic category fallback
+      const fallbackPrice = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
+      const minP = Math.round(fallbackPrice * 0.85);
+      const maxP = Math.round(fallbackPrice * 1.25);
       calculatedBaseTotal += fallbackPrice * quantity;
       calculatedMinTotal += minP * quantity;
       calculatedMaxTotal += maxP * quantity;

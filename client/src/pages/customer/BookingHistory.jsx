@@ -58,22 +58,7 @@ export const BookingHistory = () => {
           });
           const uniqueBookings = Array.from(uniqueMap.values());
 
-          // Only show sample demo records if it is specifically the demo user Aarav and has zero records
-          if (uniqueBookings.length === 0 && user?.phone === '9876543210') {
-            setBookings([
-              {
-                bookingNumber: 'CS-2026-0905-001',
-                category: 'electrical',
-                serviceTitle: 'Ceiling Fan Repair / Capacitor Replace',
-                date: '05 Sep 2026',
-                workerName: 'Ramesh Kumar (Worker A)',
-                amount: 199,
-                status: 'completed',
-              },
-            ]);
-          } else {
-            setBookings(uniqueBookings);
-          }
+          setBookings(uniqueBookings);
         }
       } catch (err) {
         console.warn('Failed to load history:', err.message);

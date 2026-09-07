@@ -244,7 +244,7 @@ const fallbackSemanticParser = (text, knowledgeBase, isWorkerCompletion = false)
  * @param {string} text - Voice transcription or typed user request
  * @returns {Promise<Object>} Validated structured extraction
  */
-const interpretCustomerRequest = async (text) => {
+const interpretCustomerRequest = async (text, requestedCategory = null) => {
   if (!text || typeof text !== 'string' || !text.trim()) {
     throw new Error('Valid text input or voice transcript is required for interpretation.');
   }
@@ -261,11 +261,13 @@ const interpretCustomerRequest = async (text) => {
     try {
       const prompt = `
 You are the CoSathi AI Service Request Interpreter for Indian household & cooperative community services.
+Customer requested service category: "${requestedCategory || 'any'}"
 Analyze the following customer voice transcript or typed text in Hindi, English, or Hinglish:
 "${cleanText}"
 
 STRICT INSTRUCTIONS:
 1. Identify the primary serviceCategory from this approved list: [${validCategoriesList}].
+   ${requestedCategory ? `Give priority to customer selected category "${requestedCategory}" if relevant.` : ''}
 2. Identify granular individual tasks required.
 3. Map tasks to the most fitting standardized task codes from this approved cooperative list: [${validCodesList}].
    If a task does NOT clearly match any code in the approved list, use "NEEDS_REVIEW" for its code.
@@ -276,7 +278,7 @@ STRICT INSTRUCTIONS:
 
 Return STRICT JSON only matching this schema:
 {
-  "serviceCategory": "plumbing",
+  "serviceCategory": "${requestedCategory || 'plumbing'}",
   "tasks": [
     {
       "code": "TAP_REPLACEMENT",
@@ -315,12 +317,13 @@ Return STRICT JSON only matching this schema:
   // SERVER-SIDE VALIDATION & NORMALIZATION AGAINST MONGODB RATE CARD
   // =========================================================================
 
-  // 1. Validate Category
+  // 1. Validate Category (Prioritize customer explicit selection if provided)
   let validatedCategory = 'general';
-  if (rawAiOutput.serviceCategory && knowledgeBase.categorySlugs.has(rawAiOutput.serviceCategory.toLowerCase())) {
+  if (requestedCategory && knowledgeBase.categorySlugs.has(requestedCategory.toLowerCase())) {
+    validatedCategory = requestedCategory.toLowerCase();
+  } else if (rawAiOutput.serviceCategory && knowledgeBase.categorySlugs.has(rawAiOutput.serviceCategory.toLowerCase())) {
     validatedCategory = rawAiOutput.serviceCategory.toLowerCase();
   } else {
-    // Attempt fallback category match
     for (const slug of knowledgeBase.categorySlugs) {
       if (cleanText.toLowerCase().includes(slug)) {
         validatedCategory = slug;
@@ -336,7 +339,6 @@ Return STRICT JSON only matching this schema:
     const rawCode = (task.code || '').toUpperCase().trim();
     const taskLabel = task.label || task.title || 'Standard Cooperative Task';
 
-    // Check if code exists in MongoDB knowledge base
     if (knowledgeBase.taskCodeMap.has(rawCode)) {
       const dbItem = knowledgeBase.taskCodeMap.get(rawCode);
       validatedTasks.push({
@@ -346,7 +348,6 @@ Return STRICT JSON only matching this schema:
         isVerifiedRateCard: true,
       });
     } else {
-      // Unknown code -> Mark as NEEDS_REVIEW
       validatedTasks.push({
         code: 'NEEDS_REVIEW',
         label: taskLabel,
@@ -357,14 +358,22 @@ Return STRICT JSON only matching this schema:
     }
   }
 
-  // Ensure at least one task is returned
-  if (validatedTasks.length === 0) {
-    validatedTasks.push({
-      code: 'NEEDS_REVIEW',
-      label: cleanText.slice(0, 60),
-      isVerifiedRateCard: false,
-      requiresManualReview: true,
-    });
+  // If all tasks are NEEDS_REVIEW or empty, map to category primary rate card item!
+  const hasValidTask = validatedTasks.some((t) => t.code !== 'NEEDS_REVIEW');
+  if (!hasValidTask) {
+    const catItem = (knowledgeBase.rateCardItems || []).find(
+      (it) => it.category?.slug === validatedCategory || it.category === validatedCategory
+    );
+    if (catItem) {
+      const codeStr = catItem.serviceCode || catItem.code;
+      const titleStr = catItem.title?.en || catItem.name || codeStr;
+      validatedTasks.unshift({
+        code: codeStr,
+        label: titleStr,
+        rateCardItemId: catItem._id,
+        isVerifiedRateCard: true,
+      });
+    }
   }
 
   const result = {
