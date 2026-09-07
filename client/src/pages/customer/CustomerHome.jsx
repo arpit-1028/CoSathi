@@ -86,6 +86,39 @@ export const CustomerHome = () => {
         onSelectCategory={handleCategorySelect}
       />
 
+      {/* Prominent Next Step CTA when Trade is Selected */}
+      {selectedCategory && (
+        <div className="bg-[#FFFFFF] p-4 sm:p-5 rounded-2xl border-2 border-[#1B4278]/20 shadow-card flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in duration-300">
+          <div className="flex items-center space-x-3.5 text-center sm:text-left">
+            <div className="w-11 h-11 rounded-xl bg-[#1B4278] text-white flex items-center justify-center flex-shrink-0 shadow-sm font-bold">
+              ✓
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#9E472A]">
+                  Selected Service / चयनित सेवा
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#3C5A48]"></span>
+              </div>
+              <h4 className="font-serif text-lg font-bold text-[#20242A] capitalize">
+                {selectedCategory} Service
+              </h4>
+              <p className="text-xs text-[#636D79]">
+                Click proceed to describe your problem (voice/text) and receive an instant rate-card estimate.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => handleRequestReady('', selectedCategory)}
+            className="w-full sm:w-auto px-7 py-3 rounded-xl bg-[#9E472A] hover:bg-[#853920] active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center space-x-2 flex-shrink-0"
+          >
+            <span>Proceed to Book {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}</span>
+            <ArrowRight className="w-4 h-4 text-amber-200" />
+          </button>
+        </div>
+      )}
+
       {/* How CoSathi Works Section (Matching Screenshot 2) */}
       <section id="how-it-works" className="pt-4 space-y-4">
         <div className="border-b border-[#D9D5CC] pb-3">

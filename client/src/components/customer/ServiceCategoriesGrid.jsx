@@ -81,10 +81,10 @@ export const ServiceCategoriesGrid = ({ onSelectCategory, selectedCategory }) =>
                 </span>
                 <span
                   className={`text-[10px] block ${
-                    isSelected ? 'text-[#DF9F35]' : 'text-[#636D79]'
+                    isSelected ? 'text-[#DF9F35] font-semibold' : 'text-[#636D79]'
                   }`}
                 >
-                  {cat.slug === 'plumbing' ? '₹150 min' : cat.slug === 'electrical' ? '₹200 min' : 'Std Rate'}
+                  {isSelected ? 'Selected • Click to Book' : cat.slug === 'plumbing' ? '₹150 min' : cat.slug === 'electrical' ? '₹200 min' : 'Std Rate'}
                 </span>
               </div>
             </button>
