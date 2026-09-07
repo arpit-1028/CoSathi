@@ -41,13 +41,54 @@ import { CooperativeReports } from './pages/cooperative/CooperativeReports';
 import { CooperativeSettings } from './pages/cooperative/CooperativeSettings';
 import { CooperativeProfile } from './pages/cooperative/CooperativeProfile';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F7F4EE] p-4">
+          <div className="bg-white p-8 rounded-2xl border border-[#D9D5CC] shadow-md max-w-md text-center space-y-4">
+            <h3 className="font-serif text-xl font-bold text-[#20242A]">Something went wrong</h3>
+            <p className="text-xs text-[#636D79]">
+              An unexpected display issue occurred. Click reload to refresh your session.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="px-6 py-2.5 bg-[#1B4278] hover:bg-[#122A4E] text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <SocketProvider>
-          <LanguageGate />
-          <BrowserRouter>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AuthProvider>
+          <SocketProvider>
+            <LanguageGate />
+            <BrowserRouter>
             <Routes>
               {/* Public Landing & Authentication */}
               <Route path="/" element={<LandingPage />} />
@@ -118,5 +159,6 @@ export default function App() {
         </SocketProvider>
       </AuthProvider>
     </LanguageProvider>
+    </ErrorBoundary>
   );
 }
