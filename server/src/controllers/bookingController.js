@@ -375,10 +375,51 @@ const getWorkerActiveBooking = async (req, res, next) => {
       .populate('customer', 'name phone')
       .populate('category', 'name slug icon');
 
+    if (activeBooking) {
+      return res.status(200).json({
+        success: true,
+        hasActiveBooking: true,
+        hasPendingOffer: false,
+        booking: activeBooking,
+      });
+    }
+
+    // Check if there is an incoming offered/matching booking waiting for this worker
+    const pendingOffer = await Booking.findOne({
+      $or: [
+        { assignedWorker: workerId, status: { $in: [BOOKING_STATES.OFFERED, BOOKING_STATES.MATCHING] } },
+        { workerId, status: { $in: [BOOKING_STATES.OFFERED, BOOKING_STATES.MATCHING] } },
+        { 'matchingMetadata.candidateWorkerIds': workerId, status: BOOKING_STATES.OFFERED },
+      ],
+    })
+      .populate('customer', 'name phone')
+      .populate('category', 'name slug icon');
+
+    if (pendingOffer) {
+      return res.status(200).json({
+        success: true,
+        hasActiveBooking: false,
+        hasPendingOffer: true,
+        offer: {
+          bookingId: pendingOffer._id,
+          bookingNumber: pendingOffer.bookingNumber,
+          customerName: pendingOffer.customer?.name || 'Customer',
+          category: pendingOffer.category?.name?.en || pendingOffer.serviceCategory || 'Service',
+          serviceCategory: pendingOffer.serviceCategory,
+          rawText: pendingOffer.voiceTranscript,
+          address: pendingOffer.address?.addressLine || pendingOffer.address?.city || 'Local Zone',
+          floorPayout: pendingOffer.initialEstimate || 250,
+          tasks: pendingOffer.tasks,
+          timeoutSeconds: 120,
+        },
+      });
+    }
+
     res.status(200).json({
       success: true,
-      hasActiveBooking: Boolean(activeBooking),
-      booking: activeBooking,
+      hasActiveBooking: false,
+      hasPendingOffer: false,
+      booking: null,
     });
   } catch (error) {
     next(error);

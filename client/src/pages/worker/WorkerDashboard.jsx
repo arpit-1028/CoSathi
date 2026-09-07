@@ -112,6 +112,9 @@ export const WorkerDashboard = () => {
               : b.status === 'IN_PROGRESS' ? 'working'
               : 'accepted',
           });
+        } else if (res.data?.hasPendingOffer && res.data.offer) {
+          setIncomingBookingOffer(res.data.offer);
+          setShowIncomingAlert(true);
         }
       } catch (err) {
         // Safe ignore

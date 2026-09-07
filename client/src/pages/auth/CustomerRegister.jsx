@@ -4,6 +4,44 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { User, Phone, Mail, Lock, MapPin, ArrowRight, AlertCircle } from 'lucide-react';
 
+export const INDIAN_CITIES = [
+  'Delhi NCR',
+  'New Delhi',
+  'Noida',
+  'Greater Noida',
+  'Ghaziabad',
+  'Gurgaon (Gurugram)',
+  'Faridabad',
+  'Mumbai',
+  'Pune',
+  'Bengaluru',
+  'Hyderabad',
+  'Chennai',
+  'Kolkata',
+  'Ahmedabad',
+  'Jaipur',
+  'Lucknow',
+  'Kanpur',
+  'Patna',
+  'Bhopal',
+  'Indore',
+  'Chandigarh',
+  'Meerut',
+  'Agra',
+  'Varanasi',
+  'Surat',
+  'Vadodara',
+  'Nagpur',
+  'Nashik',
+  'Kochi',
+  'Coimbatore',
+  'Dehradun',
+  'Ranchi',
+  'Guwahati',
+  'Amritsar',
+  'Prayagraj',
+];
+
 export const CustomerRegister = () => {
   const { register } = useAuth();
   const { t, language } = useLanguage();
@@ -14,7 +52,7 @@ export const CustomerRegister = () => {
     phone: '',
     email: '',
     password: '',
-    address: '',
+    city: 'New Delhi',
     role: 'customer',
     preferredLanguage: language,
   });
@@ -29,9 +67,35 @@ export const CustomerRegister = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // 1. Phone number validation (strictly 10 digits)
+    const cleanPhone = formData.phone.trim().replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+      setError(language === 'hi' ? 'कृपया सही 10-अंकों का मोबाइल नंबर दर्ज करें।' : 'Mobile number must be exactly 10 digits.');
+      return;
+    }
+
+    // 2. Password validation (minimum 6 characters)
+    if (formData.password.length < 6) {
+      setError(language === 'hi' ? 'पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।' : 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    // 3. City validation (Only valid Indian cities)
+    if (!formData.city || !INDIAN_CITIES.includes(formData.city)) {
+      setError(language === 'hi' ? 'कृपया सूची से एक मान्य भारतीय शहर चुनें।' : 'Please select a valid Indian city from the list.');
+      return;
+    }
+
     setLoading(true);
 
-    const res = await register(formData);
+    const payload = {
+      ...formData,
+      phone: cleanPhone,
+      address: formData.city,
+    };
+
+    const res = await register(payload);
     setLoading(false);
 
     if (res.success) {
@@ -85,17 +149,21 @@ export const CustomerRegister = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-cosathi-muted uppercase mb-1">
-                {t('auth.phone')}
+                {t('auth.phone')} (10 Digits)
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 absolute left-3.5 top-3 text-cosathi-muted" />
                 <input
                   type="tel"
                   required
+                  maxLength={10}
                   name="phone"
                   placeholder="10 digit number"
                   value={formData.phone}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    const onlyNums = e.target.value.replace(/\D/g, '');
+                    setFormData({ ...formData, phone: onlyNums });
+                  }}
                   className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-cosathi-border focus:outline-none focus:border-cosathi-clay bg-white"
                 />
               </div>
@@ -121,15 +189,16 @@ export const CustomerRegister = () => {
 
           <div>
             <label className="block text-xs font-semibold text-cosathi-muted uppercase mb-1">
-              {t('auth.passwordLabel')}
+              {t('auth.passwordLabel')} (Min. 6 Characters)
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3 text-cosathi-muted" />
               <input
                 type="password"
                 required
+                minLength={6}
                 name="password"
-                placeholder="Create password"
+                placeholder="Minimum 6 characters"
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-cosathi-border focus:outline-none focus:border-cosathi-clay bg-white"
@@ -137,22 +206,30 @@ export const CustomerRegister = () => {
             </div>
           </div>
 
+          {/* Service City Dropdown (Only Valid Indian Cities) */}
           <div>
             <label className="block text-xs font-semibold text-cosathi-muted uppercase mb-1">
-              Service Address
+              Service City / सेवा शहर (India)
             </label>
             <div className="relative">
-              <MapPin className="w-4 h-4 absolute left-3.5 top-3 text-cosathi-muted" />
-              <input
-                type="text"
+              <MapPin className="w-4 h-4 absolute left-3.5 top-3 text-cosathi-muted pointer-events-none" />
+              <select
                 required
-                name="address"
-                placeholder="e.g. B-12, Green Park, New Delhi"
-                value={formData.address}
+                name="city"
+                value={formData.city}
                 onChange={handleChange}
-                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-cosathi-border focus:outline-none focus:border-cosathi-clay bg-white"
-              />
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-cosathi-border focus:outline-none focus:border-cosathi-clay bg-white text-[#20242A] appearance-none"
+              >
+                {INDIAN_CITIES.map((cityName) => (
+                  <option key={cityName} value={cityName}>
+                    {cityName}
+                  </option>
+                ))}
+              </select>
             </div>
+            <span className="text-[10px] text-cosathi-muted mt-1 block">
+              Only verified cooperative service cities in India are eligible.
+            </span>
           </div>
 
           <button

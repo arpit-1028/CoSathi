@@ -92,7 +92,7 @@ export const Login = () => {
             <Sparkles className="w-3.5 h-3.5 text-cosathi-ochre" />
             <span>{t('auth.demoQuickLogin')}</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
             <button
               type="button"
               onClick={() => handleQuickDemo('customer@cosathi.demo', 'customer')}
@@ -112,7 +112,7 @@ export const Login = () => {
             >
               <div className="flex items-center space-x-2 mb-1">
                 <Wrench className="w-3.5 h-3.5 text-cosathi-forest" />
-                <span className="text-xs font-bold text-cosathi-slate">Worker</span>
+                <span className="text-xs font-bold text-cosathi-slate">Worker (Default)</span>
               </div>
               <span className="text-[10px] text-cosathi-muted block truncate">worker@cosathi.demo</span>
             </button>
@@ -128,6 +128,33 @@ export const Login = () => {
               </div>
               <span className="text-[10px] text-cosathi-muted block truncate">admin@cosathi.demo</span>
             </button>
+          </div>
+
+          {/* Quick Trade Worker Selectors for Live Evaluation */}
+          <div className="pt-2 border-t border-[#D9D5CC]/60">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#636D79] block mb-1.5">
+              Live Evaluation: Login by Assigned Trade Worker
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-center">
+              {[
+                { label: '🚰 Plumber', phone: '9810010005', name: 'Imran Khan' },
+                { label: '⚡ Electrician', phone: '9810010002', name: 'Manoj Tiwari' },
+                { label: '🧹 Cleaning', phone: '9810010010', name: 'Sunita Devi' },
+                { label: '🪚 Carpenter', phone: '9810010006', name: 'Kavita C.' },
+                { label: '📺 Appliance', phone: '9810010008', name: 'Deepak V.' },
+              ].map((w) => (
+                <button
+                  key={w.phone}
+                  type="button"
+                  onClick={() => handleQuickDemo(w.phone, 'worker')}
+                  className="p-1.5 rounded-lg bg-white border border-[#D9D5CC] hover:border-[#1B4278] hover:bg-slate-50 transition-all text-left"
+                  title={`Login as ${w.name} (${w.phone})`}
+                >
+                  <span className="text-[10px] font-bold text-[#20242A] block truncate">{w.label}</span>
+                  <span className="text-[9px] text-[#636D79] block truncate">{w.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
