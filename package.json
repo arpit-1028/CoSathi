@@ -1,0 +1,19 @@
+{
+  "name": "cosathi-root",
+  "version": "1.0.0",
+  "description": "CoSathi - Cooperative-Owned Household and Community Services Platform (SIH 2026)",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "seed": "npm --prefix server run seed",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": ["cooperative", "sih2026", "fair-work", "mern", "gemini-ai"],
+  "author": "CoSathi Team",
+  "license": "MIT"
+}
