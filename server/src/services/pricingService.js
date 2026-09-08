@@ -56,29 +56,34 @@ const calculateInitialEstimate = async (tasksInput = []) => {
     const quantity = Math.max(1, parseInt(raw.quantity || raw.estimatedUnits || 1, 10) || 1);
 
     if (code === 'NEEDS_REVIEW' || !code) {
-      // Try to find category rate card item by category hint in task label
+      const taskText = `${raw.label || ''} ${raw.title || ''} ${raw.rawText || ''}`.toLowerCase();
       const categoryHint = (raw.categorySlug || raw.category || raw.serviceCategory || '').toLowerCase();
-      let categoryRateItem = null;
-      if (categoryHint) {
-        categoryRateItem = await RateCardItem.findOne({
-          $and: [{ $or: [{ active: true }, { isActive: true }] }],
-        }).populate('category', 'slug').then((items) => null);
-        // Try direct category lookup
-        try {
-          const { ServiceCategory } = require('../models');
-          const catDoc = await ServiceCategory.findOne({ slug: categoryHint });
-          if (catDoc) {
-            categoryRateItem = await RateCardItem.findOne({
-              category: catDoc._id,
-              $or: [{ active: true }, { isActive: true }],
-            }).sort({ basePrice: 1 });
-          }
-        } catch (e) {}
+
+      // Realistic market pricing heuristics for unstructured voice/text requests
+      let baseDiag = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 0);
+
+      if (!baseDiag || baseDiag < 150) {
+        const isFullDay = /\b(ek\s*din|pure\s*din|full\s*day|din\s*bhar|8\s*ghante|8\s*hr|duty|1\s*din)\b/i.test(taskText) ||
+          /(पूरा\s*दिन|एक\s*दिन|दिन\s*भर|ड्यूटी|दिन\s*के\s*लिए)/.test(taskText);
+        const isDriver = categoryHint === 'driver' || /\b(driver|driving|gaadi|car)\b/i.test(taskText);
+        const isHelp = categoryHint === 'domestic-help' || /\b(maid|helper|domestic|bai|kamwali)\b/i.test(taskText);
+        const isCare = categoryHint === 'caregiver' || /\b(caregiver|care|elder|patient|dadaji)\b/i.test(taskText);
+        const isPaint = categoryHint === 'painting' || /\b(paint|painter|rangai)\b/i.test(taskText);
+
+        if (isDriver) {
+          baseDiag = isFullDay ? 1199 : 599; // ₹1,199 full day driver, ₹599 local 4hr
+        } else if (isHelp) {
+          baseDiag = isFullDay ? 799 : 349;  // ₹799 full day maid/helper, ₹349 meal prep
+        } else if (isCare) {
+          baseDiag = isFullDay ? 1299 : 699; // ₹1,299 patient/elder care day shift
+        } else if (isPaint) {
+          baseDiag = 1299; // Room painting
+        } else {
+          // Standard cooperative diagnostic inspection fee
+          baseDiag = 249;
+        }
       }
 
-      const baseDiag = categoryRateItem
-        ? Number(categoryRateItem.basePrice || categoryRateItem.standardRate || 249)
-        : Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
       const minDiag = Math.round(baseDiag * 0.85);
       const maxDiag = Math.round(baseDiag * 1.25);
       calculatedBaseTotal += baseDiag * quantity;
@@ -134,8 +139,36 @@ const calculateInitialEstimate = async (tasksInput = []) => {
         needsReview: false,
       });
     } else {
-      // Unknown code in system: dynamic category fallback
-      const fallbackPrice = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
+      // Known standard cooperative rate cards map (guarantees realistic market prices even if DB item not synced)
+      const KNOWN_STANDARD_RATES = {
+        DRIVER_FULL_DAY: 1199,
+        DRIVER_LOCAL_4HR: 599,
+        DRIVER_AIRPORT_TRIP: 499,
+        HELP_FULL_DAY: 799,
+        HELP_MEAL_PREP: 249,
+        HELP_UTENSILS_MOPPING: 220,
+        CARE_ELDER_DAYTIME: 999,
+        PAINT_ROOM_WALL: 1299,
+        PAINT_WATERPROOF_SEEPAGE: 650,
+        GARDEN_FULL_MAINTENANCE: 499,
+        CLEAN_KITCHEN_DEEP: 799,
+        CLEAN_BATHROOM_DEEP: 399,
+        AC_SERVICE_GEN: 599,
+        FRIDGE_COOLING_REPAIR: 450,
+        ELEC_MCB_FAULT: 299,
+        ELEC_FAN_REPAIR: 199,
+        TAP_REPLACEMENT: 300,
+        DRAIN_BLOCKAGE: 250,
+        CARP_DOOR_LOCK: 249,
+      };
+
+      const fallbackPrice = Number(
+        raw.unitPrice ||
+        raw.estimatedPrice ||
+        KNOWN_STANDARD_RATES[code] ||
+        raw.rate ||
+        249
+      );
       const minP = Math.round(fallbackPrice * 0.85);
       const maxP = Math.round(fallbackPrice * 1.25);
       calculatedBaseTotal += fallbackPrice * quantity;

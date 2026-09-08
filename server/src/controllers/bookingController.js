@@ -401,10 +401,15 @@ const getWorkerBookings = async (req, res, next) => {
  * GET /api/worker/bookings/active
  * Worker: view currently active ongoing booking
  */
+/**
+ * GET /api/worker/bookings/active
+ * Worker: view currently active ongoing booking AND pending dispatch offers
+ */
 const getWorkerActiveBooking = async (req, res, next) => {
   try {
     const workerId = req.user._id;
 
+    // 1. Check for ongoing active booking
     const activeBooking = await Booking.findOne({
       $or: [{ workerId }, { assignedWorker: workerId }],
       status: {
@@ -420,51 +425,106 @@ const getWorkerActiveBooking = async (req, res, next) => {
       .populate('customer', 'name phone')
       .populate('category', 'name slug icon');
 
-    if (activeBooking) {
-      return res.status(200).json({
-        success: true,
-        hasActiveBooking: true,
-        hasPendingOffer: false,
-        booking: activeBooking,
-      });
-    }
-
-    // Check if there is an incoming offered/matching booking waiting for this worker
-    const pendingOffer = await Booking.findOne({
+    // 2. ALWAYS check for incoming offered / dispatch booking waiting in the system
+    // Query direct assignments first, then any open unfulfilled offer
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    let pendingOffer = await Booking.findOne({
       $or: [
         { assignedWorker: workerId, status: { $in: [BOOKING_STATES.OFFERED, BOOKING_STATES.MATCHING] } },
         { workerId, status: { $in: [BOOKING_STATES.OFFERED, BOOKING_STATES.MATCHING] } },
         { 'matchingMetadata.candidateWorkerIds': workerId, status: BOOKING_STATES.OFFERED },
       ],
     })
+      .sort({ createdAt: -1 })
       .populate('customer', 'name phone')
       .populate('category', 'name slug icon');
 
+    // If no direct worker assignment, show any recent booking waiting in cooperative dispatch pool!
+    if (!pendingOffer) {
+      pendingOffer = await Booking.findOne({
+        status: { $in: [BOOKING_STATES.OFFERED, BOOKING_STATES.MATCHING] },
+        createdAt: { $gte: twoHoursAgo },
+      })
+        .sort({ createdAt: -1 })
+        .populate('customer', 'name phone')
+        .populate('category', 'name slug icon');
+    }
+
+    let offerData = null;
     if (pendingOffer) {
-      return res.status(200).json({
-        success: true,
-        hasActiveBooking: false,
-        hasPendingOffer: true,
-        offer: {
-          bookingId: pendingOffer._id,
-          bookingNumber: pendingOffer.bookingNumber,
-          customerName: pendingOffer.customer?.name || 'Customer',
-          category: pendingOffer.category?.name?.en || pendingOffer.serviceCategory || 'Service',
-          serviceCategory: pendingOffer.serviceCategory,
-          rawText: pendingOffer.voiceTranscript,
-          address: pendingOffer.address?.addressLine || pendingOffer.address?.city || 'Local Zone',
-          floorPayout: pendingOffer.initialEstimate || 250,
-          tasks: pendingOffer.tasks,
-          timeoutSeconds: 120,
-        },
-      });
+      const categoryName = typeof pendingOffer.category?.name === 'object'
+        ? pendingOffer.category.name.en || pendingOffer.category.name.hi
+        : pendingOffer.category?.name || pendingOffer.serviceCategory || 'Cooperative Service';
+
+      offerData = {
+        bookingId: pendingOffer._id,
+        bookingNumber: pendingOffer.bookingNumber,
+        customerName: pendingOffer.customer?.name || 'Verified Customer',
+        customerPhone: pendingOffer.customer?.phone || 'Available after accept',
+        category: categoryName,
+        serviceCategory: pendingOffer.serviceCategory,
+        serviceTitle: pendingOffer.tasks?.[0]?.title || `${categoryName} Service`,
+        rawText: pendingOffer.voiceTranscript || pendingOffer.requirementInput?.rawText || 'Customer service requirement',
+        address: pendingOffer.address?.addressLine || pendingOffer.address?.city || 'Delhi NCR',
+        distance: '1.2 km away',
+        floorPayout: pendingOffer.initialEstimate || pendingOffer.finalPrice || 499,
+        tasks: pendingOffer.tasks,
+        timeoutSeconds: 120,
+      };
     }
 
     res.status(200).json({
       success: true,
-      hasActiveBooking: false,
-      hasPendingOffer: false,
-      booking: null,
+      hasActiveBooking: !!activeBooking,
+      hasPendingOffer: !!pendingOffer,
+      booking: activeBooking || null,
+      offer: offerData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/worker/bookings/clear-active
+ * Worker resets / clears a stuck active booking (useful for demo & resets)
+ */
+const clearWorkerActiveBooking = async (req, res, next) => {
+  try {
+    const workerId = req.user._id;
+    await Booking.updateMany(
+      {
+        $or: [{ workerId }, { assignedWorker: workerId }],
+        status: {
+          $in: [
+            BOOKING_STATES.ACCEPTED,
+            BOOKING_STATES.ON_THE_WAY,
+            BOOKING_STATES.ARRIVED,
+            BOOKING_STATES.IN_PROGRESS,
+            BOOKING_STATES.WORK_SUBMITTED,
+            BOOKING_STATES.OFFERED,
+          ],
+        },
+      },
+      {
+        $set: {
+          status: BOOKING_STATES.COMPLETED,
+          completedAt: new Date(),
+        },
+        $push: {
+          timeline: {
+            status: BOOKING_STATES.COMPLETED,
+            changedBy: workerId,
+            timestamp: new Date(),
+            note: 'Booking cleared and marked completed by worker.',
+          },
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Active bookings cleared. Worker ready for fresh dispatches.',
     });
   } catch (error) {
     next(error);
@@ -909,4 +969,5 @@ module.exports = {
   matchBooking,
   getBookingEstimate,
   demoAcceptBooking,
+  clearWorkerActiveBooking,
 };

@@ -319,9 +319,15 @@ const handleWorkerAcceptOffer = async (bookingId, workerUser) => {
     booking._id
   );
   if (conflict) {
-    const error = new Error(`Cannot accept job: You are already actively engaged on booking ${conflict.bookingNumber}.`);
-    error.statusCode = 409;
-    throw error;
+    const conflictAgeMs = Date.now() - new Date(conflict.createdAt).getTime();
+    if (conflictAgeMs > 2 * 60 * 60 * 1000) {
+      conflict.status = BOOKING_STATES.COMPLETED;
+      await conflict.save();
+    } else {
+      const error = new Error(`Cannot accept job: You are already actively engaged on booking ${conflict.bookingNumber}.`);
+      error.statusCode = 409;
+      throw error;
+    }
   }
 
   const workerProfile = await WorkerProfile.findOne({ user: workerUser._id });

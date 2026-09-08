@@ -88,6 +88,31 @@ const fallbackSemanticParser = (text, knowledgeBase, isWorkerCompletion = false)
 
   // 1. Category Detection
   if (
+    /\b(driver|driving|gaadi|car|chauffeur|pickup|drop|outstation|cab|taxi)\b/i.test(normalized) ||
+    /(ड्राइवर|गाड़ी|कार|ड्राइव|सवारी)/.test(normalized)
+  ) {
+    detectedCategory = 'driver';
+  } else if (
+    /\b(maid|helper|domestic|bai|kamwali|safaiwali|household|bartan|khana|pocha|jhadu|cook|cooking)\b/i.test(normalized) ||
+    /(घरेलू|सहायिका|कामवाली|दाई|बर्तन|पोछा|खाना|रसोई)/.test(normalized)
+  ) {
+    detectedCategory = 'domestic-help';
+  } else if (
+    /\b(caregiver|care|elder|patient|dadaji|nanaji|dadi|nani|bimar|hospital|attendant|nursing)\b/i.test(normalized) ||
+    /(बुजुर्ग|देखभाल|मरीज|दादाजी|नानाजी|दादी|नानी|बीमार|अस्पताल)/.test(normalized)
+  ) {
+    detectedCategory = 'caregiver';
+  } else if (
+    /\b(paint|painter|painting|rangai|putty|waterproof|seepage|whitewash)\b/i.test(normalized) ||
+    /(पेंट|पेंटर|रंगाई|पुट्टी|सीलन)/.test(normalized)
+  ) {
+    detectedCategory = 'painting';
+  } else if (
+    /\b(garden|gardener|mali|plant|balcony|gamla|lawn|grass|pruning)\b/i.test(normalized) ||
+    /(माली|बागवानी|पौधे|गमला|घास)/.test(normalized)
+  ) {
+    detectedCategory = 'gardening';
+  } else if (
     /\b(nal|tap|pipe|leak|drain|flush|sewage|plumb|sink|faucet|basin)\b/i.test(normalized) ||
     /(नल|सिंक|पाइप|लीक|ड्रेन|नाली|सीवेज)/.test(normalized)
   ) {
@@ -110,12 +135,93 @@ const fallbackSemanticParser = (text, knowledgeBase, isWorkerCompletion = false)
     detectedCategory = 'carpentry';
   } else if (
     /\b(clean|cleaning|safai|deep\s+clean|kitchen|sofa)\b/i.test(normalized) ||
-    /(सफाई|क्लीनिंग|रसोई)/.test(normalized)
+    /(सफाई|क्लीनिंग)/.test(normalized)
   ) {
     detectedCategory = 'cleaning';
   }
 
   // 2. Granular Task Detection
+  // Driver tasks
+  if (detectedCategory === 'driver') {
+    const isFullDay = /\b(ek\s*din|pure\s*din|full\s*day|din\s*bhar|8\s*ghante|8\s*hr|duty|1\s*din)\b/i.test(normalized) ||
+      /(पूरा\s*दिन|एक\s*दिन|दिन\s*भर|ड्यूटी|दिन\s*के\s*लिए)/.test(normalized);
+    const isAirport = /\b(airport|flight|air\s*port)\b/i.test(normalized) || /(एयरपोर्ट)/.test(normalized);
+
+    if (isFullDay) {
+      extractedTasks.push({
+        code: 'DRIVER_FULL_DAY',
+        label: lang === 'hi' ? 'पूरा दिन शहर / बाहर ड्राइविंग (8-10 घंटे ड्यूटी)' : 'Full Day Driving Duty (8-10 Hours)',
+        estimatedPrice: 1199,
+      });
+    } else if (isAirport) {
+      extractedTasks.push({
+        code: 'DRIVER_AIRPORT_TRIP',
+        label: lang === 'hi' ? 'एयरपोर्ट पिकअप / ड्रॉप ड्राइविंग' : 'Airport Pickup / Drop Drive',
+        estimatedPrice: 499,
+      });
+    } else {
+      extractedTasks.push({
+        code: 'DRIVER_LOCAL_4HR',
+        label: lang === 'hi' ? 'स्थानीय शहर ड्राइविंग सेवा (4 घंटे)' : 'Local City Driving Service (4 Hours)',
+        estimatedPrice: 599,
+      });
+    }
+  }
+
+  // Domestic Help tasks
+  if (detectedCategory === 'domestic-help') {
+    const isFullDay = /\b(ek\s*din|pure\s*din|full\s*day|din\s*bhar|5\s*ghante|8\s*ghante)\b/i.test(normalized) ||
+      /(पूरा\s*दिन|एक\s*दिन|दिन\s*भर)/.test(normalized);
+    const isCooking = /\b(khana|cook|cooking|meal|bhojan)\b/i.test(normalized) || /(खाना|रसोई)/.test(normalized);
+
+    if (isFullDay) {
+      extractedTasks.push({
+        code: 'HELP_FULL_DAY',
+        label: lang === 'hi' ? 'दैनिक घरेलू सहायिका एवं कार्य (पूरा दिन)' : 'Full Day Domestic Help Assistance',
+        estimatedPrice: 799,
+      });
+    } else if (isCooking) {
+      extractedTasks.push({
+        code: 'HELP_MEAL_PREP',
+        label: lang === 'hi' ? 'घर का खाना बनाना (1 समय का भोजन)' : 'Home Meal Cooking (1-Time Meal Prep)',
+        estimatedPrice: 249,
+      });
+    } else {
+      extractedTasks.push({
+        code: 'HELP_UTENSILS_MOPPING',
+        label: lang === 'hi' ? 'बर्तन सफाई एवं फर्श पोछा सहायता' : 'Utensils Cleaning & Floor Mopping Assistance',
+        estimatedPrice: 220,
+      });
+    }
+  }
+
+  // Caregiver tasks
+  if (detectedCategory === 'caregiver') {
+    extractedTasks.push({
+      code: 'CARE_ELDER_DAYTIME',
+      label: lang === 'hi' ? 'वरिष्ठ नागरिक / मरीज देखभाल एवं सहायता (दिन की सेवा)' : 'Senior Citizen Daytime Companion Care (4-8 Hours)',
+      estimatedPrice: 999,
+    });
+  }
+
+  // Painting tasks
+  if (detectedCategory === 'painting') {
+    extractedTasks.push({
+      code: 'PAINT_ROOM_WALL',
+      label: lang === 'hi' ? 'कमरे की रंगाई, सीलन रोकथाम व पुट्टी' : 'Room Wall Painting & Putty Treatment',
+      estimatedPrice: 1299,
+    });
+  }
+
+  // Gardening tasks
+  if (detectedCategory === 'gardening') {
+    extractedTasks.push({
+      code: 'GARDEN_FULL_MAINTENANCE',
+      label: lang === 'hi' ? 'बागवानी, पौधों की छंटाई एवं खाद डालना' : 'Garden Maintenance, Pruning & Plant Care',
+      estimatedPrice: 499,
+    });
+  }
+
   // Plumbing: Tap
   if (
     /\b(nal|tap|faucet|leak)\b/i.test(normalized) ||
@@ -317,12 +423,13 @@ Return STRICT JSON only matching this schema:
   // SERVER-SIDE VALIDATION & NORMALIZATION AGAINST MONGODB RATE CARD
   // =========================================================================
 
-  // 1. Validate Category (Prioritize customer explicit selection if provided)
+  // 1. Validate Category
+  // If AI/semantic engine detected a specific category from the user's speech/text, that takes priority over a stale default category!
   let validatedCategory = 'general';
-  if (requestedCategory && knowledgeBase.categorySlugs.has(requestedCategory.toLowerCase())) {
-    validatedCategory = requestedCategory.toLowerCase();
-  } else if (rawAiOutput.serviceCategory && knowledgeBase.categorySlugs.has(rawAiOutput.serviceCategory.toLowerCase())) {
+  if (rawAiOutput.serviceCategory && rawAiOutput.serviceCategory !== 'general' && knowledgeBase.categorySlugs.has(rawAiOutput.serviceCategory.toLowerCase())) {
     validatedCategory = rawAiOutput.serviceCategory.toLowerCase();
+  } else if (requestedCategory && requestedCategory !== 'general' && knowledgeBase.categorySlugs.has(requestedCategory.toLowerCase())) {
+    validatedCategory = requestedCategory.toLowerCase();
   } else {
     for (const slug of knowledgeBase.categorySlugs) {
       if (cleanText.toLowerCase().includes(slug)) {

@@ -23,6 +23,9 @@ import {
   Bell,
   ArrowRight,
   Radio,
+  XCircle,
+  Trash2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const WorkerDashboard = () => {
@@ -91,7 +94,7 @@ export const WorkerDashboard = () => {
     };
   }, [socket]);
 
-  // Load existing active booking on initial mount and poll every 3s
+  // Load existing active booking on initial mount and poll every 2.5s
   useEffect(() => {
     const fetchActiveJob = async () => {
       try {
@@ -102,6 +105,7 @@ export const WorkerDashboard = () => {
           res = await api.get('/bookings/active');
         }
 
+        // 1. Set active job if ongoing
         if (res.data?.hasActiveBooking && res.data.booking) {
           const b = res.data.booking;
           setActiveJob({
@@ -118,7 +122,12 @@ export const WorkerDashboard = () => {
               : b.status === 'IN_PROGRESS' ? 'working'
               : 'accepted',
           });
-        } else if (res.data?.hasPendingOffer && res.data.offer) {
+        } else {
+          setActiveJob(null);
+        }
+
+        // 2. Set incoming dispatch offer (runs independently so new requests always show!)
+        if (res.data?.hasPendingOffer && res.data.offer) {
           setIncomingBookingOffer(res.data.offer);
           setShowIncomingAlert(true);
         }
@@ -128,7 +137,7 @@ export const WorkerDashboard = () => {
     };
 
     fetchActiveJob();
-    const interval = setInterval(fetchActiveJob, 3000);
+    const interval = setInterval(fetchActiveJob, 2500);
     return () => clearInterval(interval);
   }, []);
 
@@ -148,6 +157,7 @@ export const WorkerDashboard = () => {
       ...bookingData,
       status: 'accepted',
     });
+    setIncomingBookingOffer(null);
   };
 
   const handleDeclineBooking = async () => {
@@ -161,6 +171,17 @@ export const WorkerDashboard = () => {
       }
     }
     setIncomingBookingOffer(null);
+  };
+
+  const handleClearActiveJob = async () => {
+    if (!window.confirm(language === 'hi' ? 'क्या आप इस कार्य को पूर्ण और साफ़ करना चाहते हैं? इससे नया कार्य प्राप्त हो सकेगा।' : 'Clear this active job and mark complete? This enables receiving new requests.')) return;
+    try {
+      await api.post('/bookings/worker/clear-active');
+      setActiveJob(null);
+    } catch (e) {
+      console.warn('Clear error:', e);
+      setActiveJob(null);
+    }
   };
 
   const handleJobAction = async () => {
@@ -239,6 +260,66 @@ export const WorkerDashboard = () => {
           {t('worker.toggleDutyPrompt')}
         </p>
       </div>
+
+      {/* TOP URGENT BANNER: NEW WORK ASSIGNED / INCOMING REQUEST */}
+      {incomingBookingOffer && (
+        <div className="bg-gradient-to-br from-amber-50 via-white to-orange-50 border-2 border-[#DF9F35] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 ring-4 ring-amber-300/60 animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex items-start justify-between border-b border-amber-200/80 pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-xl bg-[#24324A] text-[#DF9F35] flex items-center justify-center font-bold shadow-md flex-shrink-0">
+                <Bell className="w-6 h-6 animate-bounce" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-red-600 text-white px-2.5 py-0.5 rounded-full inline-block mb-1 animate-pulse shadow-xs">
+                  🚨 {language === 'hi' ? 'नया काम आवंटित • तत्काल उत्तर दें' : 'NEW WORK ASSIGNED • ACT NOW'}
+                </span>
+                <h3 className="font-serif text-lg font-bold text-[#20242A]">
+                  {incomingBookingOffer.category || 'Cooperative Service'}
+                </h3>
+                <span className="text-xs text-[#636D79] block">
+                  Ref #{incomingBookingOffer.bookingNumber} • {incomingBookingOffer.distance || '1.2 km away'}
+                </span>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <span className="text-[10px] uppercase font-bold text-[#636D79] block">Floor Payout</span>
+              <span className="text-xl font-serif font-black text-[#3C5A48]">₹{incomingBookingOffer.floorPayout}</span>
+            </div>
+          </div>
+
+          {/* Customer Requirement & Location */}
+          <div className="bg-white rounded-xl p-3.5 border border-amber-200 space-y-1.5 text-xs shadow-xs">
+            <div className="flex items-center justify-between font-semibold text-[#20242A]">
+              <span>👤 {incomingBookingOffer.customerName || 'Verified Customer'}</span>
+              <span className="text-[#636D79]">📍 {incomingBookingOffer.address}</span>
+            </div>
+            <p className="text-sm font-serif italic text-[#24324A] font-medium bg-amber-50/70 p-2.5 rounded-lg border border-amber-200/60">
+              "{incomingBookingOffer.rawText}"
+            </p>
+          </div>
+
+          {/* Action Buttons: Accept or Reject */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleDeclineBooking}
+              className="py-3 px-4 rounded-xl border border-rose-300 bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-xs active:scale-98"
+            >
+              <XCircle className="w-4 h-4" />
+              <span>{language === 'hi' ? 'अस्वीकार करें (Reject)' : 'Reject'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleAcceptBooking(incomingBookingOffer)}
+              className="py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-md ring-2 ring-emerald-500 animate-pulse active:scale-98"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{language === 'hi' ? 'कार्य स्वीकार करें (Accept Work)' : 'Accept Work'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Service Area & Operational Radius Card */}
       <div className="bg-[#FFFFFF] rounded-xl p-5 border border-[#D9D5CC] shadow-card space-y-3">
@@ -357,6 +438,19 @@ export const WorkerDashboard = () => {
               </>
             )}
           </button>
+
+          {/* Reset / Clear Active Job button (for demo / hackathon resets) */}
+          <div className="pt-2 flex items-center justify-between border-t border-[#E2DDD3] text-xs">
+            <span className="text-[#636D79]">Need to free your account for new jobs?</span>
+            <button
+              type="button"
+              onClick={handleClearActiveJob}
+              className="text-rose-600 hover:text-rose-800 hover:underline font-bold flex items-center space-x-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{language === 'hi' ? 'कार्य पूर्ण / साफ़ करें (Clear Job)' : 'Clear / Reset Job'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         /* Demo Dispatch Simulator Button */

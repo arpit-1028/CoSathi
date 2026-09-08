@@ -20,6 +20,7 @@ const {
   matchBooking,
   getBookingEstimate,
   demoAcceptBooking,
+  clearWorkerActiveBooking,
 } = require('../controllers/bookingController');
 const {
   getBookingLiveTracking,
@@ -40,6 +41,7 @@ router.post('/:id/match', matchBooking);
 // Worker operations
 router.get('/worker/assigned', requireRole(['worker', 'cooperative_admin']), getWorkerBookings);
 router.get('/worker/active', requireRole(['worker', 'cooperative_admin']), getWorkerActiveBooking);
+router.post('/worker/clear-active', requireRole(['worker', 'cooperative_admin']), clearWorkerActiveBooking);
 router.get('/assigned', requireRole(['worker', 'cooperative_admin']), getWorkerBookings);
 router.get('/active', requireRole(['worker', 'cooperative_admin']), getWorkerActiveBooking);
 
