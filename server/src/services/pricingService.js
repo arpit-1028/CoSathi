@@ -62,14 +62,20 @@ const calculateInitialEstimate = async (tasksInput = []) => {
       // Realistic market pricing heuristics for unstructured voice/text requests
       let baseDiag = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 0);
 
-      if (!baseDiag || baseDiag < 150) {
-        const isFullDay = /\b(ek\s*din|pure\s*din|full\s*day|din\s*bhar|8\s*ghante|8\s*hr|duty|1\s*din)\b/i.test(taskText) ||
-          /(पूरा\s*दिन|एक\s*दिन|दिन\s*भर|ड्यूटी|दिन\s*के\s*लिए)/.test(taskText);
-        const isDriver = categoryHint === 'driver' || /\b(driver|driving|gaadi|car)\b/i.test(taskText);
-        const isHelp = categoryHint === 'domestic-help' || /\b(maid|helper|domestic|bai|kamwali)\b/i.test(taskText);
-        const isCare = categoryHint === 'caregiver' || /\b(caregiver|care|elder|patient|dadaji)\b/i.test(taskText);
-        const isPaint = categoryHint === 'painting' || /\b(paint|painter|rangai)\b/i.test(taskText);
+      const isFullDay = /\b(ek\s*din|pure\s*din|full\s*day|din\s*bhar|8\s*ghante|8\s*hr|duty|1\s*din)\b/i.test(taskText) ||
+        /(पूरा\s*दिन|एक\s*दिन|दिन\s*भर|ड्यूटी|दिन\s*के\s*लिए)/.test(taskText);
+      const isDriver = categoryHint === 'driver' || /\b(driver|driving|gaadi|car)\b/i.test(taskText);
+      const isHelp = categoryHint === 'domestic-help' || /\b(maid|helper|domestic|bai|kamwali)\b/i.test(taskText);
+      const isCare = categoryHint === 'caregiver' || /\b(caregiver|care|elder|patient|dadaji)\b/i.test(taskText);
+      const isPaint = categoryHint === 'painting' || /\b(paint|painter|rangai)\b/i.test(taskText);
+      const isPlumb = categoryHint === 'plumbing' || /\b(nal|tap|pipe|leak|drain|plumb)\b/i.test(taskText);
+      const isElec = categoryHint === 'electrical' || /\b(fan|pankha|switch|light|wire|mcb)\b/i.test(taskText);
 
+      const hasRecognizedIntent = isDriver || isHelp || isCare || isPaint || isPlumb || isElec;
+
+      let baseDiag = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 0);
+
+      if (hasRecognizedIntent) {
         if (isDriver) {
           baseDiag = isFullDay ? 1199 : 599; // ₹1,199 full day driver, ₹599 local 4hr
         } else if (isHelp) {
@@ -78,10 +84,32 @@ const calculateInitialEstimate = async (tasksInput = []) => {
           baseDiag = isFullDay ? 1299 : 699; // ₹1,299 patient/elder care day shift
         } else if (isPaint) {
           baseDiag = 1299; // Room painting
-        } else {
-          // Standard cooperative diagnostic inspection fee
-          baseDiag = 249;
+        } else if (isPlumb) {
+          baseDiag = 250;
+        } else if (isElec) {
+          baseDiag = 199;
         }
+      }
+
+      // If truly unclear / random noise / gibberish: NO FAKE NUMBERS!
+      if (!hasRecognizedIntent && !baseDiag) {
+        itemizedDetails.push({
+          code: 'NEEDS_REVIEW',
+          name: raw.label || 'On-site Inspection Required',
+          nameHindi: 'मौके पर जांच (विवरण स्पष्ट नहीं)',
+          unitPrice: null,
+          minPrice: null,
+          maxPrice: null,
+          quantity: 1,
+          subtotal: null,
+          minSubtotal: null,
+          maxSubtotal: null,
+          unit: 'on_site',
+          rateCardVersion,
+          needsReview: true,
+          isUnclear: true,
+        });
+        continue;
       }
 
       const minDiag = Math.round(baseDiag * 0.85);

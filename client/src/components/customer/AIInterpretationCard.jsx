@@ -45,6 +45,8 @@ export const AIInterpretationCard = ({
   const minRange = minEstimate && minEstimate > 0 ? minEstimate : (computedTotal ? Math.round(computedTotal * 0.85) : null);
   const maxRange = maxEstimate && maxEstimate > 0 ? maxEstimate : (computedTotal ? Math.round(computedTotal * 1.25) : null);
 
+  const isUnclearInput = (confidence && confidence < 0.75) || tasksToDisplay.every((t) => t.code === 'NEEDS_REVIEW' && !t.unitPrice);
+
   return (
     <div className="space-y-4">
       {/* Cooperative Fair Pricing Directive Header */}
@@ -62,6 +64,26 @@ export const AIInterpretationCard = ({
         </div>
       </div>
 
+      {/* Unclear Requirement Notice (if AI cannot parse random/noise input) */}
+      {isUnclearInput && (
+        <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 flex items-start space-x-3 shadow-xs animate-in fade-in duration-200">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold text-xs uppercase tracking-wide text-amber-900 block">
+              विवरण स्पष्ट नहीं है • Unclear Requirement (On-Site Diagnosis)
+            </span>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              AI requirement ko poori tarah pehchan nahi paya (<strong>"{rawRequirement}"</strong>). Koi dikkat nahi! Aap booking kar sakte hain — hamare <strong>Cooperative Sathi</strong> aapke address par aakar issue inspect karenge aur cooperative rate card ke hisab se transparent rate batayenge.
+            </p>
+            <div className="pt-1">
+              <span className="inline-flex items-center text-[11px] font-bold bg-amber-200/80 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                ✨ ₹0 Advance • Price determined after on-site inspection
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Task Structuring Box */}
       <div className="bg-[#FFFFFF] rounded-xl p-5 sm:p-6 border border-[#D9D5CC] shadow-card space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E2DDD3] gap-2">
@@ -76,9 +98,11 @@ export const AIInterpretationCard = ({
           </div>
 
           <div className="flex items-center space-x-2 text-xs">
-            <span className="px-2.5 py-1 rounded-md bg-[#F2EFEB] text-[#3C5A48] font-bold border border-[#D9D5CC] flex items-center space-x-1">
+            <span className={`px-2.5 py-1 rounded-md font-bold border flex items-center space-x-1 ${
+              isUnclearInput ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-[#F2EFEB] text-[#3C5A48] border-[#D9D5CC]'
+            }`}>
               <Check className="w-3 h-3" />
-              <span>Confidence: {Math.round((confidence || 0.94) * 100)}%</span>
+              <span>Confidence: {Math.round((confidence || (isUnclearInput ? 0.35 : 0.94)) * 100)}%</span>
             </span>
             <span className="px-2.5 py-1 rounded-md bg-[#F7F4EE] text-[#20242A] font-medium border border-[#D9D5CC] flex items-center space-x-1 uppercase text-[10px]">
               <Languages className="w-3 h-3 text-[#A65343]" />
@@ -90,11 +114,11 @@ export const AIInterpretationCard = ({
         {/* Structured Task Items */}
         <div className="space-y-2">
           {tasksToDisplay.map((task, idx) => {
-            const isReview = task.code === 'NEEDS_REVIEW';
+            const isReview = task.code === 'NEEDS_REVIEW' || !task.unitPrice;
             return (
               <div
                 key={idx}
-                className={`p-3 rounded-lg border flex items-center justify-between ${
+                className={`p-3.5 rounded-lg border flex items-center justify-between ${
                   isReview
                     ? 'bg-[#FFF8E7] border-[#DF9F35]'
                     : 'bg-[#F7F4EE] border-[#D9D5CC]'
@@ -110,27 +134,33 @@ export const AIInterpretationCard = ({
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h4 className="text-xs font-bold text-[#20242A]">{task.title || task.label || task.name}</h4>
+                      <h4 className="text-xs font-bold text-[#20242A]">
+                        {task.title || task.label || task.name || (isReview ? 'On-site Inspection Required' : 'Service Task')}
+                      </h4>
                       {isReview && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#DF9F35]/20 text-[#8C4334] uppercase">
-                          Manual Review
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#DF9F35]/20 text-[#8C4334] uppercase border border-[#DF9F35]/40">
+                          On-Site Diagnosis
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-[#636D79]">
-                      Item Code: <code className={`font-mono text-xs px-1 py-0.5 rounded border ${
-                        isReview ? 'bg-white text-[#8C4334]' : 'bg-white text-[#24324A]'
-                      }`}>{task.code || 'TASK_STANDARD'}</code> • Qty: {task.quantity || 1}
+                    <span className="text-[11px] text-[#636D79] block mt-0.5">
+                      {isReview ? (
+                        <span>Description: <em>"{rawRequirement || 'Customer request'}"</em></span>
+                      ) : (
+                        <span>Item Code: <code className="font-mono text-xs px-1 py-0.5 rounded border bg-white text-[#24324A]">{task.code || 'TASK_STANDARD'}</code> • Qty: {task.quantity || 1}</span>
+                      )}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-[#20242A]">
-                    {task.unitPrice != null
+                  <span className="text-sm font-bold text-[#20242A] block">
+                    {task.unitPrice != null && task.unitPrice > 0
                       ? `₹${(task.unitPrice * (task.quantity || 1))}`
-                      : 'On-site rate'}
+                      : 'To be decided on-site'}
                   </span>
-                  <span className="block text-[10px] text-[#636D79]">Official Rate</span>
+                  <span className="text-[10px] text-[#636D79]">
+                    {task.unitPrice != null && task.unitPrice > 0 ? 'Official Rate Card' : 'मौके पर तय होगा'}
+                  </span>
                 </div>
               </div>
             );
@@ -146,17 +176,19 @@ export const AIInterpretationCard = ({
             </span>
           </div>
 
-          {minRange && maxRange ? (
-            <div className="flex items-center justify-between text-xs text-[#636D79]">
-              <span>Estimated Range (Uncertainty Buffer):</span>
-              <span className="font-semibold text-[#20242A]">₹{minRange}–₹{maxRange}</span>
-            </div>
-          ) : null}
+          <div className="flex items-center justify-between text-xs text-[#636D79]">
+            <span>Estimated Range (Uncertainty Buffer):</span>
+            <span className="font-semibold text-[#20242A]">
+              {minRange && maxRange ? `₹${minRange}–₹${maxRange}` : 'To be decided on-site (स्थल पर जांच)'}
+            </span>
+          </div>
 
           <div className="pt-2 border-t border-[#E2DDD3] flex items-center justify-between text-sm font-bold text-[#20242A]">
             <div>
               <span className="font-serif">Initial Estimate / अनुमानित शुल्क:</span>
-              <span className="block text-[11px] font-normal text-[#636D79]">Based on scheduled rate card</span>
+              <span className="block text-[11px] font-normal text-[#636D79]">
+                {computedTotal != null ? 'Based on scheduled rate card' : 'Sathi will inspect on-site'}
+              </span>
             </div>
             <div className="text-right">
               {computedTotal != null ? (
@@ -167,7 +199,14 @@ export const AIInterpretationCard = ({
                   )}
                 </>
               ) : (
-                <span className="text-base font-serif font-bold text-[#636D79]">On-site estimate</span>
+                <div>
+                  <span className="text-sm sm:text-base font-serif font-bold text-[#A65343] block">
+                    To be decided on-site
+                  </span>
+                  <span className="block text-[10px] text-[#3C5A48] font-bold">
+                    ₹0 Advance (Pay on-site)
+                  </span>
+                </div>
               )}
             </div>
           </div>

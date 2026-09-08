@@ -326,10 +326,12 @@ const fallbackSemanticParser = (text, knowledgeBase, isWorkerCompletion = false)
   }
 
   // Default fallback if no specific rule matched
-  if (extractedTasks.length === 0) {
+  const isUnclear = extractedTasks.length === 0;
+  if (isUnclear) {
     extractedTasks.push({
       code: 'NEEDS_REVIEW',
-      label: text.slice(0, 50),
+      label: `On-site inspection (${text.slice(0, 40)})`,
+      isUnclear: true,
     });
   }
 
@@ -337,7 +339,8 @@ const fallbackSemanticParser = (text, knowledgeBase, isWorkerCompletion = false)
     serviceCategory: detectedCategory,
     tasks: extractedTasks,
     language: lang,
-    confidence: extractedTasks[0].code === 'NEEDS_REVIEW' ? 0.72 : 0.94,
+    confidence: isUnclear ? 0.35 : 0.94,
+    isUnclear,
   };
 };
 
@@ -465,9 +468,9 @@ Return STRICT JSON only matching this schema:
     }
   }
 
-  // If all tasks are NEEDS_REVIEW or empty, map to category primary rate card item!
+  // If all tasks are NEEDS_REVIEW or empty, ONLY map to category primary rate card item if user explicitly selected a category and did not enter noise
   const hasValidTask = validatedTasks.some((t) => t.code !== 'NEEDS_REVIEW');
-  if (!hasValidTask) {
+  if (!hasValidTask && !rawAiOutput.isUnclear && validatedCategory !== 'general' && validatedCategory !== 'electrical') {
     const catItem = (knowledgeBase.rateCardItems || []).find(
       (it) => it.category?.slug === validatedCategory || it.category === validatedCategory
     );
@@ -485,16 +488,19 @@ Return STRICT JSON only matching this schema:
 
   const result = {
     serviceCategory: validatedCategory,
+    isUnclear: !!rawAiOutput.isUnclear,
     tasks: validatedTasks.map((t) => ({
       code: t.code,
       label: t.label,
+      isUnclear: !!rawAiOutput.isUnclear || t.code === 'NEEDS_REVIEW',
     })),
     language: rawAiOutput.language || detectLanguage(cleanText),
-    confidence: Number(rawAiOutput.confidence) || 0.94,
+    confidence: rawAiOutput.isUnclear ? 0.35 : (Number(rawAiOutput.confidence) || 0.94),
     metadata: {
       rawInput: cleanText,
       verifiedTaskCount: validatedTasks.filter((t) => t.code !== 'NEEDS_REVIEW').length,
       needsReviewCount: validatedTasks.filter((t) => t.code === 'NEEDS_REVIEW').length,
+      isUnclear: !!rawAiOutput.isUnclear,
     },
   };
 
