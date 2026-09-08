@@ -154,10 +154,13 @@ const dispatchBookingOffer = async (bookingId, options = {}) => {
   const candidate = matchResult.matchedWorker;
   const workerIdStr = candidate.workerId.toString();
 
-  // If worker is offline: booking should move to next eligible worker
-  const shouldSkipOffline = options.skipOffline !== false && onlineWorkerSockets.size > 0;
-  if (shouldSkipOffline && !isWorkerOnline(candidate.workerId)) {
-    console.log(`[Dispatch] Worker ${candidate.workerName} (${workerIdStr}) is offline. Routing to next eligible online worker...`);
+  // Only skip offline workers if there ARE other online workers to route to.
+  // If NOBODY is online (common in demo/dev), still assign to the best candidate
+  // so they can see it via polling on the worker dashboard.
+  const someoneElseIsOnline = [...onlineWorkerSockets.keys()].some((id) => id !== workerIdStr);
+  const shouldSkipOffline = options.skipOffline !== false && someoneElseIsOnline && !isWorkerOnline(candidate.workerId);
+  if (shouldSkipOffline) {
+    console.log(`[Dispatch] Worker ${candidate.workerName} (${workerIdStr}) is offline, routing to next online worker...`);
     if (!booking.matchingMetadata.rejectedWorkerIds) {
       booking.matchingMetadata.rejectedWorkerIds = [];
     }

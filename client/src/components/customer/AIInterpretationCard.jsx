@@ -34,10 +34,16 @@ export const AIInterpretationCard = ({
     },
   ];
 
-  const tasksToDisplay = parsedTasks.length > 0 ? parsedTasks : defaultTasks;
-  const computedTotal = estimatedTotal || tasksToDisplay.reduce((sum, item) => sum + ((item.unitPrice || 250) * (item.quantity || 1)), 0);
-  const minRange = minEstimate || Math.round(computedTotal * 0.85);
-  const maxRange = maxEstimate || Math.round(computedTotal * 1.25);
+  // Only show default tasks if truly no parsed tasks
+  const tasksToDisplay = parsedTasks.length > 0 ? parsedTasks : [];
+  const hasRealPrices = tasksToDisplay.some((t) => t.unitPrice != null && t.unitPrice > 0);
+  const computedTotal = estimatedTotal != null && estimatedTotal > 0
+    ? estimatedTotal
+    : hasRealPrices
+      ? tasksToDisplay.reduce((sum, item) => sum + ((item.unitPrice || 0) * (item.quantity || 1)), 0)
+      : null;
+  const minRange = minEstimate && minEstimate > 0 ? minEstimate : (computedTotal ? Math.round(computedTotal * 0.85) : null);
+  const maxRange = maxEstimate && maxEstimate > 0 ? maxEstimate : (computedTotal ? Math.round(computedTotal * 1.25) : null);
 
   return (
     <div className="space-y-4">
@@ -119,7 +125,11 @@ export const AIInterpretationCard = ({
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-[#20242A]">₹{(task.unitPrice || 250) * (task.quantity || 1)}</span>
+                  <span className="text-sm font-bold text-[#20242A]">
+                    {task.unitPrice != null
+                      ? `₹${(task.unitPrice * (task.quantity || 1))}`
+                      : 'On-site rate'}
+                  </span>
                   <span className="block text-[10px] text-[#636D79]">Official Rate</span>
                 </div>
               </div>
@@ -136,10 +146,12 @@ export const AIInterpretationCard = ({
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-[#636D79]">
-            <span>Estimated Range (Uncertainty Buffer):</span>
-            <span className="font-semibold text-[#20242A]">₹{minRange}–₹{maxRange}</span>
-          </div>
+          {minRange && maxRange ? (
+            <div className="flex items-center justify-between text-xs text-[#636D79]">
+              <span>Estimated Range (Uncertainty Buffer):</span>
+              <span className="font-semibold text-[#20242A]">₹{minRange}–₹{maxRange}</span>
+            </div>
+          ) : null}
 
           <div className="pt-2 border-t border-[#E2DDD3] flex items-center justify-between text-sm font-bold text-[#20242A]">
             <div>
@@ -147,8 +159,16 @@ export const AIInterpretationCard = ({
               <span className="block text-[11px] font-normal text-[#636D79]">Based on scheduled rate card</span>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-serif font-bold text-[#24324A]">₹{computedTotal}</span>
-              <span className="block text-[10px] text-[#636D79]">Range: ₹{minRange}–₹{maxRange}</span>
+              {computedTotal != null ? (
+                <>
+                  <span className="text-2xl font-serif font-bold text-[#24324A]">₹{computedTotal}</span>
+                  {minRange && maxRange && (
+                    <span className="block text-[10px] text-[#636D79]">Range: ₹{minRange}–₹{maxRange}</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-base font-serif font-bold text-[#636D79]">On-site estimate</span>
+              )}
             </div>
           </div>
         </div>

@@ -128,10 +128,10 @@ export const BookServiceWorkflow = () => {
   const [isListening, setIsListening] = useState(false);
   const [micError, setMicError] = useState(null);
 
-  const estimatedTotal =
-    parsedTasks.length > 0
-      ? parsedTasks.reduce((sum, t) => sum + (t.unitPrice || 250) * (t.quantity || 1), 0)
-      : minEstimate || 249;
+  const hasRealPrices = parsedTasks.some((t) => t.unitPrice != null && t.unitPrice > 0);
+  const estimatedTotal = hasRealPrices
+    ? parsedTasks.reduce((sum, t) => sum + (t.unitPrice || 0) * (t.quantity || 1), 0)
+    : (minEstimate && minEstimate > 0 ? minEstimate : null);
 
   // Toggle Speech Recognition with device mic check
   const toggleSpeechRecognition = async () => {
@@ -226,7 +226,12 @@ export const BookServiceWorkflow = () => {
         if (Array.isArray(aiData.tasks) && aiData.tasks.length > 0) {
           // Reconcile Gemini tasks against MongoDB RateCard for authoritative pricing
           try {
-            const estRes = await api.post('/rate-card/estimate', { tasks: aiData.tasks });
+            const tasksWithCategory = aiData.tasks.map((t) => ({
+              ...t,
+              categorySlug: aiData.serviceCategory || category,
+              serviceCategory: aiData.serviceCategory || category,
+            }));
+            const estRes = await api.post('/rate-card/estimate', { tasks: tasksWithCategory });
             if (estRes.data?.success && estRes.data?.data) {
               const est = estRes.data.data;
               setParsedTasks(
@@ -249,9 +254,9 @@ export const BookServiceWorkflow = () => {
               code: t.code,
               title: t.label || t.title || `${category} Service #${idx + 1}`,
               quantity: 1,
-              unitPrice: t.estimatedPrice || 299,
-              minPrice: 249,
-              maxPrice: 399,
+              unitPrice: t.estimatedPrice || null,
+              minPrice: null,
+              maxPrice: null,
             }));
             setParsedTasks(mapped);
           }
@@ -262,12 +267,12 @@ export const BookServiceWorkflow = () => {
       // Clean fallback according to chosen category
       setParsedTasks([
         {
-          code: `${category.toUpperCase().replace('-', '_')}_SERVICE`,
-          title: `${category.charAt(0).toUpperCase() + category.slice(1)} Cooperative Service`,
+          code: `${category.toUpperCase().replace(/-/g, '_')}_SERVICE`,
+          title: `${category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' ')} Cooperative Service`,
           quantity: 1,
-          unitPrice: 299,
-          minPrice: 249,
-          maxPrice: 399,
+          unitPrice: null,
+          minPrice: null,
+          maxPrice: null,
         },
       ]);
     } finally {
@@ -297,7 +302,7 @@ export const BookServiceWorkflow = () => {
           estimatedPrice: t.unitPrice,
         })),
         voiceTranscript: rawText,
-        initialEstimate: estimatedTotal,
+        initialEstimate: estimatedTotal || 199,
         address: {
           addressLine: data.address || 'B-42, Lajpat Nagar II, New Delhi',
           city: 'Delhi',
@@ -689,7 +694,9 @@ export const BookServiceWorkflow = () => {
             </div>
             <div className="flex justify-between text-cosathi-muted">
               <span>Total Settled:</span>
-              <span className="font-semibold text-cosathi-forest">₹{estimatedTotal}</span>
+              <span className="font-semibold text-cosathi-forest">
+                {estimatedTotal != null ? `₹${estimatedTotal}` : 'On-site estimate'}
+              </span>
             </div>
           </div>
 

@@ -71,13 +71,18 @@ const computeSkillScore = (requiredCategoryName, requiredCategorySlug, workerPro
   const reqName = (requiredCategoryName || '').toLowerCase().trim();
   const reqSlug = (requiredCategorySlug || '').toLowerCase().trim();
 
-  // Normalize trade tokens
+  // Normalize trade tokens — covers all 10 CoSathi service categories
   const tradeEquivalents = {
-    electrical: ['electrical', 'electrician', 'appliance repair'],
-    plumbing: ['plumbing', 'plumber', 'sanitary'],
-    cleaning: ['cleaning', 'deep cleaning', 'sanitization', 'domestic help'],
-    carpentry: ['carpentry', 'carpenter', 'furniture'],
-    painting: ['painting', 'painter', 'whitewash'],
+    electrical: ['electrical', 'electrician', 'appliance repair', 'electric'],
+    plumbing: ['plumbing', 'plumber', 'sanitary', 'pipe'],
+    cleaning: ['cleaning', 'deep cleaning', 'sanitization', 'domestic help', 'domestic-help', 'domestic'],
+    carpentry: ['carpentry', 'carpenter', 'furniture', 'wood'],
+    painting: ['painting', 'painter', 'whitewash', 'paint'],
+    gardening: ['gardening', 'gardener', 'garden', 'horticulture'],
+    driver: ['driver', 'driving', 'chauffeur', 'taxi', 'cab'],
+    caregiver: ['caregiver', 'care', 'nursing', 'elder care', 'health'],
+    'appliance-repair': ['appliance repair', 'appliance', 'electrical', 'electrician'],
+    'domestic-help': ['domestic help', 'domestic', 'cleaning', 'housekeeping', 'maid'],
   };
 
   const isExactPrimary =
@@ -113,7 +118,11 @@ const computeSkillScore = (requiredCategoryName, requiredCategorySlug, workerPro
  * Compute Availability Score (0 - 100)
  */
 const computeAvailabilityScore = (workerAvailability) => {
-  if (!workerAvailability || !workerAvailability.isOnDuty) {
+  // No availability doc means worker never explicitly set off-duty — treat as available
+  if (!workerAvailability) {
+    return { score: 80, reason: 'No duty status set — treated as available (cooperative default)' };
+  }
+  if (!workerAvailability.isOnDuty) {
     return { score: 0, reason: 'Worker is off-duty' };
   }
 
@@ -403,8 +412,9 @@ const findBestWorkerMatch = async (bookingIdOrDoc, options = {}) => {
     if (rejectedWorkerIds.includes(uId)) continue;
 
     const availability = availMap[uId];
-    // Check if worker is on duty
-    if (!availability || !availability.isOnDuty) continue;
+    // Treat workers with no availability doc (never set status) as on-duty in demo mode
+    // Only hard-exclude if explicitly set off-duty
+    if (availability && availability.isOnDuty === false) continue;
 
     // Check double-booking conflicts
     const conflict = await checkWorkerDoubleBooking(
@@ -467,10 +477,12 @@ const findBestWorkerMatch = async (bookingIdOrDoc, options = {}) => {
   };
 
   // 3. Score each eligible candidate
-  const scoredCandidates = eligibleCandidates
-    .map((candidate) => scoreCandidateWorker(candidate, booking, poolContext, options.weights))
-    // Filter out workers who have zero skill match
-    .filter((candidate) => candidate.scores.skillScore > 0);
+  const allScoredCandidates = eligibleCandidates
+    .map((candidate) => scoreCandidateWorker(candidate, booking, poolContext, options.weights));
+
+  // Prefer workers with skill match. If none found, include all eligible workers as fallback.
+  const skilledCandidates = allScoredCandidates.filter((c) => c.scores.skillScore > 0);
+  const scoredCandidates = skilledCandidates.length > 0 ? skilledCandidates : allScoredCandidates;
 
   if (scoredCandidates.length === 0) {
     return {

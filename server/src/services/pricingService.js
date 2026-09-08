@@ -56,8 +56,29 @@ const calculateInitialEstimate = async (tasksInput = []) => {
     const quantity = Math.max(1, parseInt(raw.quantity || raw.estimatedUnits || 1, 10) || 1);
 
     if (code === 'NEEDS_REVIEW' || !code) {
-      // Unlisted / custom task flagged for on-site diagnostic
-      const baseDiag = Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
+      // Try to find category rate card item by category hint in task label
+      const categoryHint = (raw.categorySlug || raw.category || raw.serviceCategory || '').toLowerCase();
+      let categoryRateItem = null;
+      if (categoryHint) {
+        categoryRateItem = await RateCardItem.findOne({
+          $and: [{ $or: [{ active: true }, { isActive: true }] }],
+        }).populate('category', 'slug').then((items) => null);
+        // Try direct category lookup
+        try {
+          const { ServiceCategory } = require('../models');
+          const catDoc = await ServiceCategory.findOne({ slug: categoryHint });
+          if (catDoc) {
+            categoryRateItem = await RateCardItem.findOne({
+              category: catDoc._id,
+              $or: [{ active: true }, { isActive: true }],
+            }).sort({ basePrice: 1 });
+          }
+        } catch (e) {}
+      }
+
+      const baseDiag = categoryRateItem
+        ? Number(categoryRateItem.basePrice || categoryRateItem.standardRate || 249)
+        : Number(raw.unitPrice || raw.estimatedPrice || raw.rate || 249);
       const minDiag = Math.round(baseDiag * 0.85);
       const maxDiag = Math.round(baseDiag * 1.25);
       calculatedBaseTotal += baseDiag * quantity;
